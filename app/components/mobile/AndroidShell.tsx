@@ -114,6 +114,22 @@ export default function AndroidShell() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // Handle programmatic tab changes (e.g. from fallback buttons)
+  useEffect(() => {
+    const handleOpenTab = (e: Event) => {
+      const customEvent = e as CustomEvent<MobileTab>;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+
+    window.addEventListener('open-mobile-tab', handleOpenTab);
+
+    return () => {
+      window.removeEventListener('open-mobile-tab', handleOpenTab);
+    };
+  }, []);
+
   // Log platform info on mount
   useEffect(() => {
     console.log('[AndroidShell] Mounted', {

@@ -9,6 +9,9 @@ import { classNames } from '~/utils/classNames';
 import { Terminal, type TerminalRef } from './Terminal';
 import { TerminalManager } from './TerminalManager';
 import { createScopedLogger } from '~/utils/logger';
+import { runtimeModeStore } from '~/lib/stores/runtime-mode';
+import { isCapacitor } from '~/lib/adapters/platform';
+import { toast } from 'react-toastify';
 
 const logger = createScopedLogger('Terminal');
 
@@ -18,6 +21,8 @@ export const DEFAULT_TERMINAL_SIZE = 25;
 export const TerminalTabs = memo(() => {
   const showTerminal = useStore(workbenchStore.showTerminal);
   const theme = useStore(themeStore);
+  const runtime = useStore(runtimeModeStore);
+  const showTerminalFallback = !runtime.capabilities.terminal;
 
   const terminalRefs = useRef<Map<number, TerminalRef>>(new Map());
   const terminalPanelRef = useRef<ImperativePanelHandle>(null);
@@ -215,61 +220,85 @@ export const TerminalTabs = memo(() => {
               onClick={() => workbenchStore.toggleTerminal(false)}
             />
           </div>
-          {Array.from({ length: terminalCount + 1 }, (_, index) => {
-            const isActive = activeTerminal === index;
+          {showTerminalFallback ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-bolt-elements-terminals-background text-bolt-elements-textPrimary">
+              <div className="i-ph:terminal-window-duotone text-5xl text-bolt-elements-textSecondary mb-3" />
+              <h3 className="text-md font-semibold mb-1">Terminal Unavailable</h3>
+              <p className="text-xs text-bolt-elements-textSecondary max-w-sm mb-4 leading-relaxed">
+                Interactive terminals require a WebContainer environment (only supported on desktop browsers) or a Remote Runtime connection.
+              </p>
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    if (isCapacitor()) {
+                      window.dispatchEvent(new CustomEvent('open-mobile-tab', { detail: 'settings' }));
+                    } else {
+                      toast.info("Please open Settings > Runtime Mode from the sidebar to configure Remote Runtime.");
+                    }
+                  }
+                }}
+                className="px-3.5 py-1.5 bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text rounded-lg text-xs font-medium transition-colors"
+              >
+                Configure Remote Runtime
+              </button>
+            </div>
+          ) : (
+            Array.from({ length: terminalCount + 1 }, (_, index) => {
+              const isActive = activeTerminal === index;
 
-            logger.debug(`Starting bolt terminal [${index}]`);
+              logger.debug(`Starting bolt terminal [${index}]`);
 
-            if (index == 0) {
-              return (
-                <React.Fragment key={`terminal-container-${index}`}>
-                  <Terminal
-                    key={`terminal-${index}`}
-                    id={`terminal_${index}`}
-                    className={classNames('h-full overflow-hidden modern-scrollbar-invert', {
-                      hidden: !isActive,
-                    })}
-                    ref={(ref) => {
-                      if (ref) {
-                        terminalRefs.current.set(index, ref);
-                      }
-                    }}
-                    onTerminalReady={(terminal) => workbenchStore.attachBoltTerminal(terminal)}
-                    onTerminalResize={(cols, rows) => workbenchStore.onTerminalResize(cols, rows)}
-                    theme={theme}
-                  />
-                  <TerminalManager
-                    terminal={terminalRefs.current.get(index)?.getTerminal() || null}
-                    isActive={isActive}
-                  />
-                </React.Fragment>
-              );
-            } else {
-              return (
-                <React.Fragment key={`terminal-container-${index}`}>
-                  <Terminal
-                    key={`terminal-${index}`}
-                    id={`terminal_${index}`}
-                    className={classNames('modern-scrollbar h-full overflow-hidden', {
-                      hidden: !isActive,
-                    })}
-                    ref={(ref) => {
-                      if (ref) {
-                        terminalRefs.current.set(index, ref);
-                      }
-                    }}
-                    onTerminalReady={(terminal) => workbenchStore.attachTerminal(terminal)}
-                    onTerminalResize={(cols, rows) => workbenchStore.onTerminalResize(cols, rows)}
-                    theme={theme}
-                  />
-                  <TerminalManager
-                    terminal={terminalRefs.current.get(index)?.getTerminal() || null}
-                    isActive={isActive}
-                  />
-                </React.Fragment>
-              );
-            }
-          })}
+              if (index == 0) {
+                return (
+                  <React.Fragment key={`terminal-container-${index}`}>
+                    <Terminal
+                      key={`terminal-${index}`}
+                      id={`terminal_${index}`}
+                      className={classNames('h-full overflow-hidden modern-scrollbar-invert', {
+                        hidden: !isActive,
+                      })}
+                      ref={(ref) => {
+                        if (ref) {
+                          terminalRefs.current.set(index, ref);
+                        }
+                      }}
+                      onTerminalReady={(terminal) => workbenchStore.attachBoltTerminal(terminal)}
+                      onTerminalResize={(cols, rows) => workbenchStore.onTerminalResize(cols, rows)}
+                      theme={theme}
+                    />
+                    <TerminalManager
+                      terminal={terminalRefs.current.get(index)?.getTerminal() || null}
+                      isActive={isActive}
+                    />
+                  </React.Fragment>
+                );
+              } else {
+                return (
+                  <React.Fragment key={`terminal-container-${index}`}>
+                    <Terminal
+                      key={`terminal-${index}`}
+                      id={`terminal_${index}`}
+                      className={classNames('modern-scrollbar h-full overflow-hidden', {
+                        hidden: !isActive,
+                      })}
+                      ref={(ref) => {
+                        if (ref) {
+                          terminalRefs.current.set(index, ref);
+                        }
+                      }}
+                      onTerminalReady={(terminal) => workbenchStore.attachTerminal(terminal)}
+                      onTerminalResize={(cols, rows) => workbenchStore.onTerminalResize(cols, rows)}
+                      theme={theme}
+                    />
+                    <TerminalManager
+                      terminal={terminalRefs.current.get(index)?.getTerminal() || null}
+                      isActive={isActive}
+                    />
+                  </React.Fragment>
+                );
+              }
+            })
+          )}
         </div>
       </div>
     </Panel>

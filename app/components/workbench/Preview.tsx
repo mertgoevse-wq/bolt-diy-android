@@ -8,6 +8,9 @@ import { expoUrlAtom } from '~/lib/stores/qrCodeStore';
 import { ExpoQrModal } from '~/components/workbench/ExpoQrModal';
 import type { ElementInfo } from './Inspector';
 import { classNames } from '~/utils/classNames';
+import { runtimeModeStore } from '~/lib/stores/runtime-mode';
+import { isCapacitor } from '~/lib/adapters/platform';
+import { toast } from 'react-toastify';
 
 type ResizeSide = 'left' | 'right' | null;
 
@@ -70,6 +73,61 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
   const [isDeviceModeOn, setIsDeviceModeOn] = useState(false);
   const [widthPercent, setWidthPercent] = useState<number>(37.5);
   const [currentWidth, setCurrentWidth] = useState<number>(0);
+
+  const files = useStore(workbenchStore.files);
+  const runtime = useStore(runtimeModeStore);
+  const [useStaticPreview, setUseStaticPreview] = useState(false);
+  const [staticUrl, setStaticUrl] = useState<string | null>(null);
+
+  const hasStaticHtml = Object.keys(files).some(
+    (path) => path.endsWith('/index.html') || path === 'index.html'
+  );
+
+  const handleStartStaticPreview = () => {
+    const fileMap = workbenchStore.files.get();
+    const indexPath = Object.keys(fileMap).find(
+      (path) => path.endsWith('/index.html') || path === 'index.html'
+    );
+
+    if (indexPath) {
+      const file = fileMap[indexPath];
+
+      if (file && file.type === 'file') {
+        try {
+          if (staticUrl) {
+            URL.revokeObjectURL(staticUrl);
+          }
+
+          const blob = new Blob([file.content], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          setStaticUrl(url);
+          setUseStaticPreview(true);
+          toast.success('Basic static preview started!');
+        } catch (error) {
+          console.error('[Preview] Failed to create blob URL', error);
+          toast.error('Failed to create static preview.');
+        }
+      }
+    } else {
+      toast.error('No index.html found in your workspace.');
+    }
+  };
+
+  const handleStopStaticPreview = () => {
+    setUseStaticPreview(false);
+    if (staticUrl) {
+      URL.revokeObjectURL(staticUrl);
+      setStaticUrl(null);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (staticUrl) {
+        URL.revokeObjectURL(staticUrl);
+      }
+    };
+  }, [staticUrl]);
 
   const resizingState = useRef({
     isResizing: false,
@@ -1022,9 +1080,64 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
                 containerRef={iframeRef}
               />
             </>
+          ) : useStaticPreview && staticUrl ? (
+            <div className="flex flex-col w-full h-full relative">
+              <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-500">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="i-ph:warning-circle-fill text-sm" />
+                  Local Static Preview: Viewing in-memory index.html. Scripts/stylesheets with relative paths may not load.
+                </span>
+                <button
+                  onClick={handleStopStaticPreview}
+                  className="px-2 py-0.5 border border-amber-500/30 hover:bg-amber-500/10 rounded transition-colors"
+                >
+                  Stop Preview
+                </button>
+              </div>
+              <iframe
+                ref={iframeRef}
+                title="static-preview"
+                className="flex-1 border-none w-full h-full bg-white"
+                src={staticUrl}
+                sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"
+              />
+            </div>
           ) : (
-            <div className="flex w-full h-full justify-center items-center bg-bolt-elements-background-depth-1 text-bolt-elements-textPrimary">
-              No preview available
+            <div className="flex flex-col w-full h-full justify-center items-center p-6 text-center bg-bolt-elements-background-depth-1 text-bolt-elements-textPrimary">
+              <div className="i-ph:monitor-play text-5xl text-bolt-elements-textSecondary mb-3 animate-pulse" />
+              <h3 className="text-md font-semibold mb-1">Live Preview Unavailable</h3>
+              <p className="text-xs text-bolt-elements-textSecondary max-w-xs mb-4 leading-relaxed">
+                Live Server Preview requires a WebContainer environment (desktop browser) or a configured Remote Runtime.
+              </p>
+              {hasStaticHtml ? (
+                <div className="bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor rounded-xl p-4 max-w-sm">
+                  <p className="text-xs text-bolt-elements-textSecondary mb-3">
+                    A local <strong>index.html</strong> was detected in your workspace! You can run a basic static preview of it directly in this WebView.
+                  </p>
+                  <button
+                    onClick={handleStartStaticPreview}
+                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <span className="i-ph:play-fill" />
+                    Run Basic Static Preview
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      if (isCapacitor()) {
+                        window.dispatchEvent(new CustomEvent('open-mobile-tab', { detail: 'settings' }));
+                      } else {
+                        toast.info("Please open Settings > Runtime Mode from the sidebar to configure Remote Runtime.");
+                      }
+                    }
+                  }}
+                  className="px-3.5 py-1.5 bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text rounded-lg text-xs font-medium transition-colors"
+                >
+                  Configure Remote Runtime
+                </button>
+              )}
             </div>
           )}
 

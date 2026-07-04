@@ -6,6 +6,8 @@ import { createScopedLogger } from '~/utils/logger';
 import { unreachable } from '~/utils/unreachable';
 import type { ActionCallbackData } from './message-parser';
 import type { BoltShell } from '~/utils/shell';
+import { runtimeModeStore } from '~/lib/stores/runtime-mode';
+import { toast } from 'react-toastify';
 
 const logger = createScopedLogger('ActionRunner');
 
@@ -149,6 +151,20 @@ export class ActionRunner {
 
   async #executeAction(actionId: string, isStreaming: boolean = false) {
     const action = this.actions.get()[actionId];
+
+    // Intercept WebContainer actions on Android Fallback Mode
+    const runtimeState = runtimeModeStore.get();
+    const needsWebContainer = ['shell', 'build', 'start', 'supabase'].includes(action.type);
+
+    if (needsWebContainer && !runtimeState.capabilities.commandExecution) {
+      const errorMsg = 'Command execution requires WebContainer or Remote Runtime';
+      this.#updateAction(actionId, {
+        status: 'failed',
+        error: errorMsg,
+      });
+      toast.warning(`Action "${action.type}" blocked: ${errorMsg}`);
+      return;
+    }
 
     this.#updateAction(actionId, { status: 'running' });
 

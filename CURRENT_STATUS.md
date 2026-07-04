@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-04  
 **Branch:** `main`  
-**Commits ahead of upstream:** 10  
+**Commits ahead of upstream:** 11  
 **Target device:** Samsung Galaxy A56 (Android 15, 1080×2340)
 
 ---
@@ -141,12 +141,12 @@ bolt-diy-android/
 |--------|--------|-------|
 | Capacitor installed | ✅ Working | v7.6.7, `cap copy` succeeds |
 | Android project | ✅ Scaffolded | `com.mertgoevse.boltdiyandroid`, minSdk 23, targetSdk 35 |
-| Web build → Android | ✅ Pipeline exists | `npm run android:sync` → `remix vite:build` → `cap sync android` |
+| Web build → Android | ✅ Pipeline exists | `npm run android:sync` → `android:webbuild` → `cap sync android` |
 | WebContainer on Android | ❌ Not available | SharedArrayBuffer unsupported in WebView — guarded, app doesn't crash |
-| Terminal on Android | ⚠️ Fallback only | xterm renders but no shell process; shows empty terminal |
+| Terminal on Android | ⚠️ Polished fallback | Replaces empty xterm with designed screen & settings redirection |
 | File system on Android | ✅ IndexedDB persistence | In-memory store + IndexedDB auto-save/restore across restarts |
 | Android WebView shell | ✅ Real UI loads | `android:webbuild` → `build/client/index.html` → Capacitor |
-| Preview on Android | ❌ No preview | No WebContainer = no preview server; iframe has no URL |
+| Preview on Android | ⚠️ Basic static preview | Designed fallback screen; supports local static HTML (`index.html`) preview |
 | LLM chat on Android | ❌ Not working | 33 server-side API routes have no server in WebView |
 | Mobile UI | ❌ Not started | Desktop layouts break at 360px (533px min-width, 1200px modal) |
 | APK build | ⚠️ Config exists | `cap build android` works but produces debug APK with placeholder content |
@@ -158,9 +158,9 @@ bolt-diy-android/
 
 1. **No LLM chat** — The app's core feature (AI chat) requires server-side API routes (`api.chat.ts`, `api.llmcall.ts`, etc.) which don't exist in a WebView. This is the #1 blocker for a usable app.
 
-2. **No live preview** — WebContainer provides the dev server preview. Without it, the Preview tab shows nothing.
+2. **Live preview fallback** — Dev server preview is unavailable without WebContainer/Remote Runtime, but a designed fallback view is shown, and the user can run a basic static preview of any local `index.html` file using local Blob URLs.
 
-3. **No terminal** — The terminal tabs render but have no shell process. Users see an empty xterm instance.
+3. **Terminal fallback** — The terminal cannot run a local shell process without WebContainer, but it now shows a designed fallback screen with redirection to Remote Runtime settings.
 
 4. **IndexedDB file persistence** — Files created by AI actions are saved to IndexedDB and restored on app restart. In-memory store is always in sync with IndexedDB.
 

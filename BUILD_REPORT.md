@@ -147,13 +147,36 @@ Shims created to satisfy TypeScript for Android-only build artifacts:
 
 ---
 
+---
+
+## Android Fallback UX Polishing
+
+To provide a seamless experience on mobile where WebContainer features (like shell execution and live dev server) are unavailable, a polished fallback layer was added:
+
+### 1. Terminal Fallback
+- Replaces the blank/unresponsive xterm terminal tabs with a designed fallback view.
+- Explains: *"Terminal Unavailable: Interactive terminals require a WebContainer environment or a Remote Runtime connection."*
+- Features a **"Configure Remote Runtime"** button that programmatically navigates the user to the Settings tab in the Android app.
+
+### 2. Live Preview Fallback & Static HTML Preview
+- Detects whether an `index.html` file exists in the local workspace.
+- If present, allows a **"Run Basic Static Preview"** which reads the file in-memory and renders it inside the preview pane iframe via a local `Blob` URL.
+- Shows a warning banner: *"⚠️ Local Static Preview: Viewing in-memory index.html. External dependencies and scripts with relative paths may not load."*
+- If no `index.html` is found, explains that Live Server Preview requires a WebContainer/Remote Runtime and prompts configuring one in settings.
+
+### 3. Action Runner Interceptor
+- Intercepts all unsupported commands/actions (`shell`, `build`, `start`, `supabase`) in `action-runner.ts` on Android and marks them failed gracefully with: `"Command execution requires WebContainer or Remote Runtime"`.
+- Displays a non-blocking toast warning (`toast.warning(...)`) instead of silent failures or application crashes.
+
+---
+
 ## Remaining Limitations
 
 | Area | Status | Notes |
 |------|--------|-------|
 | LLM chat | ❌ | API routes require server; Phase 5 fix |
-| Live preview | ❌ | Needs WebContainer; Phase 4 fix |
-| Terminal | ❌ | No shell process; Phase 4 fix |
+| Live preview | ⚠️ | Polished fallback UI; basic static HTML preview supported; full dev server needs Remote Runtime |
+| Terminal | ⚠️ | Polished fallback UI with remote runtime setup redirection |
 | File persistence | ✅ | IndexedDB working |
 | UI layout (mobile) | ⚠️ | Basic tab nav works; full Phase 2 responsive pass pending |
 | APK release signing | ❌ | Phase 6 |
@@ -163,7 +186,8 @@ Shims created to satisfy TypeScript for Android-only build artifacts:
 ## Commit History
 
 ```
-feat: add reliable android webview shell   ← this commit
+feat: polish android terminal and preview fallback   ← this commit
+feat: add reliable android webview shell
 feat: add android-specific entry point and build validation
 chore: verify android persistence integration
 feat(android): add fallback storage and update runtime, adapter, and stores

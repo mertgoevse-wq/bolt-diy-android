@@ -15,9 +15,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '@nanostores/react';
 import { toast } from 'react-toastify';
-import { runtimeModeStore, resetRuntimeMode } from '~/lib/stores/runtime-mode';
+import { runtimeModeStore, resetRuntimeMode, setRuntimeMode, setRemoteRuntimeUrl, type RuntimeMode } from '~/lib/stores/runtime-mode';
 import { getAndroidFallbackPersistenceStatus } from '~/lib/persistence/androidFallbackStorage';
 import { workbenchStore } from '~/lib/stores/workbench';
+import { classNames } from '~/utils/classNames';
 
 interface PersistenceStatus {
   available: boolean;
@@ -32,6 +33,41 @@ export default function AndroidSettingsPanel() {
     hasSavedFiles: false,
   });
   const [resetting, setResetting] = useState(false);
+  const [urlInput, setUrlInput] = useState(runtime.remoteRuntimeUrl);
+
+  useEffect(() => {
+    setUrlInput(runtime.remoteRuntimeUrl);
+  }, [runtime.remoteRuntimeUrl]);
+
+  const handleUrlSave = useCallback(() => {
+    const trimmed = urlInput.trim();
+
+    if (
+      trimmed &&
+      !trimmed.startsWith('http://') &&
+      !trimmed.startsWith('https://') &&
+      !trimmed.startsWith('ws://') &&
+      !trimmed.startsWith('wss://')
+    ) {
+      toast.error('URL must start with http://, https://, ws://, or wss://');
+      return;
+    }
+
+    setRemoteRuntimeUrl(trimmed);
+    toast.success(trimmed ? 'Remote runtime URL saved' : 'Remote runtime URL cleared');
+  }, [urlInput]);
+
+  const handleModeChange = useCallback(
+    (mode: RuntimeMode) => {
+      if (mode === 'remote' && !urlInput.trim()) {
+        toast.info('Enter a remote runtime URL below to use Remote Runtime mode');
+      }
+
+      setRuntimeMode(mode);
+      toast.success(`Runtime mode set to: ${mode === 'remote' ? 'Remote Runtime' : 'Android Fallback'}`);
+    },
+    [urlInput],
+  );
 
   useEffect(() => {
     let active = true;
@@ -93,11 +129,33 @@ export default function AndroidSettingsPanel() {
             <div className="i-ph:cpu-fill" />
             Runtime Mode
           </h2>
-          <div className="android-card-content">
+          <div className="android-card-content gap-4">
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleModeChange('android-fallback')}
+                className={classNames('flex-1 py-2 rounded-lg text-xs font-semibold border transition-all', {
+                  'bg-purple-600/15 border-purple-500/50 text-purple-400': runtime.mode === 'android-fallback',
+                  'bg-transparent border-bolt-elements-borderColor text-bolt-elements-textSecondary': runtime.mode !== 'android-fallback',
+                })}
+              >
+                Android Fallback
+              </button>
+              <button
+                onClick={() => handleModeChange('remote')}
+                className={classNames('flex-1 py-2 rounded-lg text-xs font-semibold border transition-all', {
+                  'bg-purple-600/15 border-purple-500/50 text-purple-400': runtime.mode === 'remote',
+                  'bg-transparent border-bolt-elements-borderColor text-bolt-elements-textSecondary': runtime.mode !== 'remote',
+                })}
+              >
+                Remote Runtime
+              </button>
+            </div>
+
             <div className="android-mode-badge" style={{ backgroundColor: modeColor + '20', color: modeColor, borderColor: modeColor + '40' }}>
               <span className="android-mode-dot" style={{ backgroundColor: modeColor }} />
               {modeLabel}
             </div>
+
             <div className="android-capability-list">
               {[
                 { label: 'File System (in-memory)', enabled: runtime.capabilities.fileSystem },
@@ -112,6 +170,49 @@ export default function AndroidSettingsPanel() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* Remote Runtime Card */}
+        <section className={classNames('android-card', { 'opacity-60': runtime.mode !== 'remote' })}>
+          <h2 className="android-card-title">
+            <div className="i-ph:link-fill" />
+            Remote Runtime URL
+          </h2>
+          <div className="android-card-content gap-3">
+            <p className="text-xs text-bolt-elements-textSecondary leading-relaxed">
+              Connect to a remote sandbox server for terminal command execution and app previews.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="https://runtime.example.com"
+                disabled={runtime.mode !== 'remote'}
+                className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[#0A0A0A] border border-bolt-elements-borderColor text-bolt-elements-textPrimary focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-bolt-elements-textTertiary disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={handleUrlSave}
+                disabled={runtime.mode !== 'remote'}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Save
+              </button>
+            </div>
+            {runtime.remoteRuntimeUrl && (
+              <div className="text-xs text-green-500 flex items-center gap-1">
+                <div className="i-ph:check-circle-fill w-3.5 h-3.5" />
+                <span>Saved: {runtime.remoteRuntimeUrl}</span>
+              </div>
+            )}
+            <button
+              disabled
+              className="android-secondary-btn opacity-60 text-xs font-semibold py-2 mt-1 cursor-not-allowed"
+            >
+              <div className="i-ph:plugs-fill" />
+              Test Connection (Backend TODO)
+            </button>
           </div>
         </section>
 
