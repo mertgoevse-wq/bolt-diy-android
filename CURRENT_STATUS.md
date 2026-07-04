@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-04  
 **Branch:** `main`  
-**Commits ahead of upstream:** 15  
+**Commits ahead of upstream:** 16  
 **Target device:** Samsung Galaxy A56 (Android 15, 1080×2340)
 
 ---
@@ -245,9 +245,12 @@ bolt-diy-android/
 ### Phase 5: Remote Runtime Design & Scaffold ✅ COMPLETE
 
 1. **Commit `66d0dc0` — "feat: scaffold remote runtime client"**
-2. Created `docs/REMOTE_RUNTIME.md` detailing the secure API contract and WS events.
-3. Implemented `RemoteRuntimeClient.ts` with health check, workspace stubs, and preview URL stubs.
-4. Integrated Auth Token, Workspace ID, and URL fields in the Runtime Settings UI with interactive connection testing check.
+2. **Commit `5f8b651` — "feat: scaffold secure remote runtime server"**
+3. **Commit [HEAD] — "feat: connect android settings to remote runtime"**
+4. Created `docs/REMOTE_RUNTIME.md` detailing the secure API contract and WS events.
+5. Implemented `RemoteRuntimeClient.ts` with health check, workspace stubs, and single-file write methods.
+6. Connected Settings UI on Android to execute live `/health` status tests and `/workspace` creations.
+7. Workspace ID configuration is successfully persisted and connection state indicators render in UI.
 
 ### Phase 6: APK Build & Polish ⚠️ PARTIAL
 
@@ -261,11 +264,11 @@ bolt-diy-android/
 ## Git State
 
 ```
-66d0dc0 feat: scaffold remote runtime client          ← HEAD (main)
+[HEAD] feat: connect android settings to remote runtime
+5f8b651 feat: scaffold secure remote runtime server
+e94c805 chore: verify remote runtime scaffold
+66d0dc0 feat: scaffold remote runtime client
 6fd6a2e docs: add github repository metadata guide
-b00648c feat: add branding preview and apk build workflow
-80fa9c9 feat: polish android terminal and preview fallback
-117ba9f feat: add reliable android webview shell
 ```
 
 **Remote:** `origin → https://github.com/mertgoevse-wq/bolt-diy-android.git`

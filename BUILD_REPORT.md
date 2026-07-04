@@ -183,8 +183,8 @@ To provide a seamless experience on mobile where WebContainer features (like she
 ## Phase 5: Remote Runtime Design & Scaffold
 
 - **Specification**: Created `docs/REMOTE_RUNTIME.md` detailing the secure API contract and WS streams protocol.
-- **Client SDK**: Implemented `app/lib/remote-runtime/RemoteRuntimeClient.ts` to manage workspace sync and health status tests.
-- **Settings UI**: Added token/workspace fields and an interactive **"Test Connection"** trigger invoking the health check.
+- **Client SDK**: Implemented `app/lib/remote-runtime/RemoteRuntimeClient.ts` to manage workspace sync, health status tests, single-file writes, and WebSocket connections.
+- **Settings UI**: Connected Android Settings tab to trigger live GET `/health` calls (Test Connection) and POST `/workspace` calls (Create Workspace) with real-time connection state indicators (`disconnected` / `checking` / `connected` / `failed`) and detailed error rendering.
 
 ---
 
@@ -205,7 +205,9 @@ To provide a seamless experience on mobile where WebContainer features (like she
 ## Commit History
 
 ```
-chore: verify remote runtime scaffold   ← this commit
+feat: connect android settings to remote runtime   ← this commit
+feat: scaffold secure remote runtime server
+chore: verify remote runtime scaffold
 feat: scaffold remote runtime client
 docs: add github repository metadata guide
 feat: add branding preview and apk build workflow
@@ -224,4 +226,4 @@ feat: add runtime adapter layer
 ---
 
 **Verification completed**: 2026-07-04  
-**Status**: ✅ PASS — Remote Runtime scaffold complete, type-safe, and fully verified on Android WebView shell.
+**Status**: ✅ PASS — Android App successfully connected to Remote Runtime server health and workspace APIs.

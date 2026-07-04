@@ -46,9 +46,14 @@ export default function AndroidSettingsPanel() {
   const [tokenInput, setTokenInput] = useState(runtime.remoteAuthToken);
   const [workspaceInput, setWorkspaceInput] = useState(runtime.remoteWorkspaceId);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionState, setConnectionState] = useState<'disconnected' | 'checking' | 'connected' | 'failed'>('disconnected');
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
 
   useEffect(() => {
     setUrlInput(runtime.remoteRuntimeUrl);
+    setConnectionState('disconnected');
+    setLastError(null);
   }, [runtime.remoteRuntimeUrl]);
 
   useEffect(() => {
@@ -95,17 +100,62 @@ export default function AndroidSettingsPanel() {
     }
 
     setTestingConnection(true);
+    setConnectionState('checking');
+    setLastError(null);
+
     try {
       const client = new RemoteRuntimeClient(trimmedUrl, tokenInput.trim(), workspaceInput.trim());
-      const health = await client.checkHealth();
-      toast.success(`Connected successfully! Server version: ${health.version}, Status: ${health.status}`);
+      const healthResponse = await client.health();
+      
+      if (healthResponse && healthResponse.ok) {
+        setConnectionState('connected');
+        toast.success(`Connected successfully! Server: ${healthResponse.service}, Version: ${healthResponse.version}`);
+      } else {
+        setConnectionState('failed');
+        setLastError('Server responded with invalid payload');
+        toast.error('Connection failed: Server responded with invalid payload');
+      }
     } catch (err: any) {
       console.error('[RemoteRuntime] Test connection failed', err);
-      toast.error(`Connection failed: ${err.message || 'Unknown error'}`);
+      const errMsg = err.message || 'Unknown error';
+      setConnectionState('failed');
+      setLastError(errMsg);
+      toast.error(`Connection failed: ${errMsg}`);
     } finally {
       setTestingConnection(false);
     }
   }, [urlInput, tokenInput, workspaceInput]);
+
+  const handleCreateWorkspace = useCallback(async () => {
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl) {
+      toast.error('Remote Runtime URL is required to create a workspace');
+      return;
+    }
+
+    setCreatingWorkspace(true);
+    setLastError(null);
+
+    try {
+      const client = new RemoteRuntimeClient(trimmedUrl, tokenInput.trim());
+      const workspaceResponse = await client.createWorkspace('node-clean');
+      
+      if (workspaceResponse && workspaceResponse.workspaceId) {
+        setRemoteWorkspaceId(workspaceResponse.workspaceId);
+        setWorkspaceInput(workspaceResponse.workspaceId);
+        toast.success(`Workspace created successfully! ID: ${workspaceResponse.workspaceId}`);
+      } else {
+        throw new Error('Server did not return a workspace ID.');
+      }
+    } catch (err: any) {
+      console.error('[RemoteRuntime] Workspace creation failed', err);
+      const errMsg = err.message || 'Unknown error';
+      setLastError(errMsg);
+      toast.error(`Workspace creation failed: ${errMsg}`);
+    } finally {
+      setCreatingWorkspace(false);
+    }
+  }, [urlInput, tokenInput]);
 
   const handleModeChange = useCallback(
     (mode: RuntimeMode) => {
@@ -231,7 +281,7 @@ export default function AndroidSettingsPanel() {
           </h2>
           <div className="android-card-content gap-3.5">
             <p className="text-xs text-bolt-elements-textSecondary leading-relaxed">
-              Connect to a remote sandbox server for terminal command execution and app previews.
+              Remote Runtime lets Android run terminal commands and live previews on a trusted computer/server.
             </p>
 
             {/* URL Input */}
@@ -318,24 +368,64 @@ export default function AndroidSettingsPanel() {
               )}
             </div>
 
-            {/* Test Connection Button */}
-            <button
-              onClick={handleTestConnection}
-              disabled={runtime.mode !== 'remote' || testingConnection || !urlInput.trim()}
-              className="android-secondary-btn text-xs font-semibold py-2 mt-2 w-full flex items-center justify-center gap-2 hover:bg-bolt-elements-background-depth-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {testingConnection ? (
-                <>
-                  <div className="i-ph:spinner-gap animate-spin w-4 h-4" />
-                  <span>Testing Connection...</span>
-                </>
-              ) : (
-                <>
-                  <div className="i-ph:plugs-fill w-4 h-4" />
-                  <span>Test Connection</span>
-                </>
+            {/* Connection Status & Errors */}
+            <div className="flex flex-col gap-1.5 mt-1 border-t border-bolt-elements-borderColor pt-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-bolt-elements-textSecondary">Connection Status:</span>
+                <span className={classNames('font-semibold uppercase text-[10px] px-2.5 py-0.5 rounded-full border', {
+                  'bg-gray-500/10 border-gray-500/30 text-gray-400': connectionState === 'disconnected',
+                  'bg-purple-500/10 border-purple-500/30 text-purple-400': connectionState === 'checking',
+                  'bg-green-500/10 border-green-500/30 text-green-400': connectionState === 'connected',
+                  'bg-red-500/10 border-red-500/30 text-red-400': connectionState === 'failed',
+                })}>
+                  {connectionState}
+                </span>
+              </div>
+              {lastError && (
+                <div className="text-[10px] text-red-400 bg-red-950/20 border border-red-900/50 rounded-lg p-2 mt-1 break-all">
+                  <strong>Error:</strong> {lastError}
+                </div>
               )}
-            </button>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={handleTestConnection}
+                disabled={runtime.mode !== 'remote' || testingConnection || !urlInput.trim()}
+                className="flex-1 android-secondary-btn text-xs font-semibold py-2 flex items-center justify-center gap-1.5 hover:bg-bolt-elements-background-depth-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testingConnection ? (
+                  <>
+                    <div className="i-ph:spinner-gap animate-spin w-3.5 h-3.5" />
+                    <span>Testing...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="i-ph:plugs-fill w-3.5 h-3.5" />
+                    <span>Test Connection</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleCreateWorkspace}
+                disabled={runtime.mode !== 'remote' || creatingWorkspace || !urlInput.trim()}
+                className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {creatingWorkspace ? (
+                  <>
+                    <div className="i-ph:spinner-gap animate-spin w-3.5 h-3.5" />
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="i-ph:plus-circle-fill w-3.5 h-3.5" />
+                    <span>Create Workspace</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </section>
 

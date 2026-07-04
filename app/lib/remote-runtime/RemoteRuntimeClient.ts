@@ -1,7 +1,7 @@
 export interface HealthResponse {
-  status: string;
+  ok: boolean;
+  service: string;
   version: string;
-  docker: string;
 }
 
 export interface WorkspaceResponse {
@@ -54,6 +54,13 @@ export class RemoteRuntimeClient {
     }
 
     return response.json() as Promise<HealthResponse>;
+  }
+
+  /**
+   * Health Check alias
+   */
+  async health(): Promise<HealthResponse> {
+    return this.checkHealth();
   }
 
   /**
@@ -115,6 +122,13 @@ export class RemoteRuntimeClient {
   }
 
   /**
+   * Write Single File: PUT /workspace/:id/files
+   */
+  async writeFile(filePath: string, content: string): Promise<void> {
+    await this.syncFiles({ [filePath]: content });
+  }
+
+  /**
    * Run Command (Stub): POST /workspace/:id/commands
    */
   async runCommand(command: string, args: string[] = []): Promise<{ commandId: string }> {
@@ -172,5 +186,12 @@ export class RemoteRuntimeClient {
     };
 
     return ws;
+  }
+
+  /**
+   * Connect Events alias
+   */
+  connectEvents(onMessage: (event: any) => void): WebSocket {
+    return this.connectWebSocket(onMessage);
   }
 }
