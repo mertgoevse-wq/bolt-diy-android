@@ -12,6 +12,7 @@ import { ChevronDown } from 'lucide-react';
 import { GitHubErrorBoundary } from './components/GitHubErrorBoundary';
 import { GitHubProgressiveLoader } from './components/GitHubProgressiveLoader';
 import { GitHubCacheManager } from './components/GitHubCacheManager';
+import { GitHubSyncPanel } from '~/components/mobile/GitHubSyncPanel';
 
 interface ConnectionTestResult {
   status: 'success' | 'error' | 'testing';
@@ -268,6 +269,11 @@ export default function GitHubTab() {
             <div />
           </GitHubProgressiveLoader>
         )}
+
+        {/* GitHub Sync Panel — Mobile/Fallback workflow */}
+        <div className="mt-8 pt-6 border-t border-bolt-elements-borderColor">
+          <GitHubSyncPanel />
+        </div>
 
         {/* Cache Management Section - Only show when connected */}
         {isConnected && connection && (

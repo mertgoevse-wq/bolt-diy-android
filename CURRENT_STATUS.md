@@ -1,8 +1,8 @@
 # Current Android Port Status
 
-**Last updated:** 2026-07-04
+**Last updated:** 2026-07-05
 **Branch:** `main`
-**Commits ahead of upstream:** 2
+**Commits ahead of upstream:** 5
 **Target device:** Samsung Galaxy A56 (Android 15, 1080×2340)
 
 ---
@@ -41,6 +41,42 @@
 | `app/lib/webcontainer/index.ts` | Guarded boot — checks `isWebContainerSupported()` before calling `WebContainer.boot()` | Returns null promise instead of crashing |
 | `app/lib/stores/terminal.ts` | `#isFallbackMode` flag, skips `webcontainer.spawn()` when true | Terminal tabs render empty, no crash |
 | `app/lib/stores/files.ts` | `#isFallbackMode` flag, updates in-memory nanostores map when true | File tree updates work, no WebContainer FS persistence |
+
+### Runtime Adapter Layer (Phase 1) ✅ COMPLETE
+
+**Commit `d13332c` — "feat: add runtime adapter layer"**
+
+| File | Purpose |
+|------|---------|
+| `src/mobile/adapters/runtime/RuntimeAdapter.ts` | High-level interface: boot, FS, terminal, commands, dev server, preview, capabilities |
+| `src/mobile/adapters/runtime/WebContainerRuntimeAdapter.ts` | Desktop: delegates to `@webcontainer/api` |
+| `src/mobile/adapters/runtime/AndroidFallbackRuntimeAdapter.ts` | Android: in-memory FS, stub terminal, unsupported messages |
+| `src/mobile/adapters/runtime/index.ts` | Factory: `getRuntimeAdapter()`, `hasFullRuntime()`, `isFallbackMode()` |
+
+### Android Runtime Fallback Mode ✅ COMPLETE
+
+**Commit `aa05bed` — "feat: add android runtime fallback mode"**
+
+| File | Purpose |
+|------|---------|
+| `app/lib/stores/runtime-mode.ts` | Runtime mode store: detects platform, persists mode override + remote URL, capability flags |
+| `app/components/mobile/RuntimeModeBanner.tsx` | Dismissible amber banner in chat: explains fallback mode |
+| `app/components/@settings/tabs/runtime/RuntimeModeTab.tsx` | Settings tab: mode selection, remote URL input, capability matrix |
+| `app/components/@settings/core/types.ts` | Added 'runtime' tab type |
+| `app/components/@settings/core/constants.tsx` | Added runtime tab icon, label, description, default config |
+| `app/components/@settings/core/ControlPanel.tsx` | Wired RuntimeModeTab into getTabComponent |
+| `app/components/chat/BaseChat.tsx` | RuntimeModeBanner at top of chat column |
+
+### GitHub Sync Panel ✅ COMPLETE
+
+**Commit (this) — "feat: add mobile github sync panel"**
+
+| File | Purpose |
+|------|---------|
+| `app/lib/stores/github-sync.ts` | GitHub sync store: repo URL, branch, sync status, uncommitted count |
+| `app/components/mobile/GitHubSyncPanel.tsx` | Mobile-friendly sync panel: config, status, disabled commit/push buttons with explanations |
+| `app/components/@settings/tabs/github/GitHubTab.tsx` | Added GitHubSyncPanel section below existing GitHub integration |
+| `README_ANDROID.md` | Added GitHub setup docs: token connection, commit/push limitations, troubleshooting, TODO |
 
 ### Documentation ✅ COMPLETE
 
@@ -129,7 +165,7 @@ bolt.diy/
 
 5. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
 
-6. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail.
+6. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
 
 7. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
 
@@ -151,7 +187,7 @@ bolt.diy/
 | Preview iframe | No URL to load | Phase 4: fallback message or static preview |
 | Terminal process | No shell to spawn | Phase 4: fallback message |
 | File persistence | In-memory only | Phase 3: InMemoryFS with localStorage/IndexedDB backing |
-| Git operations | FS backend missing | Phase 3: InMemoryFS for isomorphic-git |
+| Git operations | FS backend missing | Phase 3: InMemoryFS for isomorphic-git. GitHub Sync panel saves config only |
 | Settings modal | 1200px fixed width | Phase 2: `w-full max-w-[1200px]` |
 | Chat layout | Forces 533px min width | Phase 2: responsive CSS override |
 | DnD (file tree, chat) | HTML5 backend, no touch | Phase 2: switch to `react-dnd-touch-backend` |

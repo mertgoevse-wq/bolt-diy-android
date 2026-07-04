@@ -158,6 +158,105 @@ The **Remote Runtime URL** field lets you save the URL of a future remote runtim
 | Code generation | ✅ | ✅ | ✅ |
 
 See `PORTING_REPORT.md` for the full technical analysis and `src/mobile/adapters/runtime/` for the adapter abstraction layer.
+## GitHub Sync
+
+### Connecting Your GitHub Account
+
+1. Open **Settings → GitHub** in the app
+2. Choose token type:
+   - **Personal Access Token (Classic)** — simplest, works for most users
+   - **Fine-grained Token** — more granular permissions
+3. Go to [github.com/settings/tokens](https://github.com/settings/tokens) to create a token
+4. Required scopes for classic tokens: `repo`, `read:org`, `read:user`
+5. Paste the token and tap **Connect**
+6. You should see your GitHub profile and repositories
+
+Alternatively, set the `VITE_GITHUB_ACCESS_TOKEN` environment variable in `.env.local` before building the app.
+
+### GitHub Sync Panel
+
+Once connected, scroll down in the GitHub settings tab to find the **GitHub Sync** panel. This panel lets you:
+
+- **Configure your repository URL** (e.g. `https://github.com/your-username/your-repo`)
+- **Set the branch name** (default: `main`)
+- **View sync status** (last sync time, uncommitted file count, error messages)
+
+### Commit & Push — Current Limitations
+
+The **Commit Changes** and **Push to GitHub** buttons are currently **disabled** on Android. Here's why:
+
+| Action | WebContainer (Desktop) | Android Fallback | Remote Runtime (Future) |
+|--------|:---:|:---:|:---:|
+| Commit | ✅ via isomorphic-git | ❌ no git runtime | ✅ via remote |
+| Push | ✅ via isomorphic-git | ❌ no git runtime | ✅ via remote |
+
+Git operations (commit, push) require a runtime that can execute `git` commands. On Android Fallback Mode, there is no local runtime — only in-memory file editing. The buttons show a clear explanation when disabled.
+
+### What You Can Do Now
+
+Even without commit/push on mobile, you can:
+- ✅ Connect your GitHub account and browse repositories
+- ✅ Configure which repo and branch you're working on
+- ✅ Edit code files in the editor
+- ✅ Generate code with AI
+- ✅ Export your project as a ZIP (Settings → Data Management)
+- ✅ Sync to your computer and commit from there
+
+### Syncing to Desktop for Commit/Push
+
+1. Edit files on your Android device
+2. Export the project as a ZIP (Settings → Data Management → Export)
+3. Transfer the ZIP to your computer
+4. Unzip into your local git repository
+5. Commit and push from your computer:
+
+```bash
+cd your-repo
+git add .
+git commit -m "Changes from Android"
+git push origin main
+```
+
+### Troubleshooting GitHub Auth/Token Issues
+
+**"Authentication failed: 401 Unauthorized"**
+- Your token may have expired. Generate a new one at github.com/settings/tokens
+- Make sure you selected the right token type (classic vs fine-grained)
+- For classic tokens, ensure the `repo` scope is checked
+
+**"Authentication failed: 403 Forbidden"**
+- Your token doesn't have sufficient permissions
+- For fine-grained tokens, make sure repository access includes the repos you need
+- Check if your organization requires SSO — you may need to authorize the token
+
+**"Could not resolve host" / Network errors**
+- Make sure your device has internet connectivity
+- GitHub API calls go to `api.github.com` — ensure it's not blocked
+- If behind a proxy, Capacitor WebView may need additional configuration
+
+**Token works on desktop but not on Android**
+- The token is stored in a cookie + localStorage. If the WebView clears storage on restart, you'll need to reconnect
+- Make sure `Cookies.set('githubToken', ...)` is not blocked by WebView settings
+- Check `capacitor.config.ts` for any storage restrictions
+
+**Fine-grained token issues**
+- Fine-grained tokens are newer and may have different permission requirements
+- Ensure "Repository access" includes the specific repos or "All repositories"
+- Organization access may need explicit approval from org admins
+
+**Connection lost after app restart**
+- The app saves your connection to localStorage. If the WebView clears storage, reconnection is needed
+- Setting `VITE_GITHUB_ACCESS_TOKEN` in `.env.local` provides automatic connection at build time
+- This is the most reliable method for Android — the token is baked into the app
+
+### TODO: Real GitHub API Integration
+
+The GitHub Sync panel currently saves configuration only. Real git operations (commit, push) via the GitHub REST API or a remote runtime server are not yet implemented. The roadmap:
+
+1. **Remote Runtime backend** — a server-side sandbox that can run git commands
+2. **GitHubSyncAdapter** — implements commit/push using the GitHub REST API (`/repos/{owner}/{repo}/git/trees`, `/git/commits`, `/git/refs`) directly, without needing a local git runtime
+3. **WebSocket sync** — real-time file sync between the app and the remote repository
+
 
 ## Configuration
 
