@@ -1,0 +1,23 @@
+--- a/package.json
++++ b/package.json
+@@ -13,6 +13,7 @@
+     "deploy": "npm run build && wrangler pages deploy",
+     "build": "remix vite:build",
++    "build:remix": "remix vite:build",
++    "build:android": "node scripts/build-android.mjs",
+     "dev": "node pre-start.cjs  && remix vite:dev",
+     "test": "vitest --run",
+     "test:watch": "vitest",
+@@ -42,10 +43,10 @@
+     "electron:build:dist": "rm -rf dist && pnpm electron:build:renderer && pnpm electron:build:deps && electron-builder --mwl",
+     "android:init": "cap add android",
+-    "android:sync": "npm run build && cap sync android",
++    "android:sync": "npm run build:android && cap sync android",
+     "android:copy": "cap copy android",
+     "android:open": "cap open android",
+-    "android:build": "npm run android:sync && cap build android",
+-    "android:run": "npm run android:sync && cap run android",
++    "android:build": "npm run build:android && cap sync android && cap build android",
++    "android:run": "npm run build:android && cap sync android && cap run android",
+     "android:clean": "cap clean android"
+   },

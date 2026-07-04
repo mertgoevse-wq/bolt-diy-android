@@ -1,0 +1,18 @@
+--- a/app/components/chat/BaseChat.tsx
++++ b/app/components/chat/BaseChat.tsx
+@@ -1,6 +1,7 @@
+ import { useStore } from '@nanostores/react';
+ import { chatStore } from '~/lib/stores/chat';
+ import RuntimeModeBanner from '../mobile/RuntimeModeBanner';
++import AndroidFallbackBanner from '../mobile/AndroidFallbackBanner';
+ import { useDeferredValue, useMemo } from 'react';
+ import { useCallbackRef } from '~/lib/hooks/useCallbackRef';
+ import { ChatMessage } from './ChatMessage';
+@@ -70,6 +71,7 @@ export const BaseChat = React.memo(() => {
+         className="flex flex-col h-full bg-bolt-elements-bg-primary overflow-hidden"
+       >
+         <RuntimeModeBanner />
++        <AndroidFallbackBanner />
+         <div
+           className="flex-1 overflow-y-auto message-scrollbar pl-6 pr-6 pt-6 pb-6 space-y-4"
+           ref={chatContainerRef}
