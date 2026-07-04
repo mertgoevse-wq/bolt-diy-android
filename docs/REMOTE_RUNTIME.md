@@ -149,5 +149,44 @@ Used to stream terminal input, output, process control, and live status updates.
 
 ## 3. Security Requirements
 1. **Token Authentication:** Every REST request and WebSocket connection upgrade MUST be validated with a cryptographically secure token.
-2. **Sandbox Isolation:** Each workspace ID must map to a separate Docker container or unprivileged user account to prevent directory traversal or remote code execution outside the workspace boundary.
-3. **Encrypted Traffic:** All endpoints must be served over HTTPS/WSS.
+2. **Sandbox Isolation:** Each workspace ID must map to a separate directory (under `remote-runtime/workspaces/`). Strict resolution checks are enforced to block traversal attempts.
+3. **Encrypted Traffic:** All endpoints must be served over HTTPS/WSS in production.
+
+---
+
+## 4. Local Setup & Testing Guide
+
+### 4.1 Running the Server
+The remote runtime package resides in `remote-runtime/`.
+
+1. **Configure Environment:**
+   Create a `.env` in the root workspace or in `remote-runtime/` using the following:
+   ```env
+   REMOTE_RUNTIME_TOKEN=change-me
+   REMOTE_RUNTIME_PORT=8787
+   REMOTE_RUNTIME_HOST=127.0.0.1
+   ```
+
+2. **Boot the Server:**
+   Using root scripts:
+   ```bash
+   npm run runtime:dev
+   ```
+
+### 4.2 Verifying Endpoints
+
+1. **Health Query:**
+   ```bash
+   curl -i http://127.0.0.1:8787/health
+   ```
+
+2. **Create Workspace:**
+   ```bash
+   curl -i -X POST -H "Authorization: Bearer change-me" http://127.0.0.1:8787/workspace
+   ```
+
+3. **Safe File Sync:**
+   ```bash
+   curl -i -X PUT -H "Authorization: Bearer change-me" -H "Content-Type: application/json" -d '{"files": {"index.html": "<h1>Hello</h1>"}}' http://127.0.0.1:8787/workspace/ws_example123/files
+   ```
+

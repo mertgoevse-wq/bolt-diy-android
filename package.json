@@ -57,7 +57,10 @@
     "android:apk:release": "node scripts/build-apk.mjs --release",
     "android:apk:path": "node scripts/build-apk.mjs --path",
     "build:remix": "remix vite:build",
-    "build:android": "node scripts/build-android.mjs"
+    "build:android": "node scripts/build-android.mjs",
+    "runtime:dev": "npm --prefix remote-runtime run dev",
+    "runtime:build": "npm --prefix remote-runtime run build",
+    "runtime:start": "npm --prefix remote-runtime run start"
   },
   "engines": {
     "node": ">=18.18.0"
