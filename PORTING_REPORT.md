@@ -56,7 +56,7 @@ The good news: the **chat, AI provider, code generation, code editor, and settin
 
 | File | Usage | Android Impact |
 |------|-------|----------------|
-| `app/lib/stores/files.ts` | `webcontainer.fs.writeFile/readFile/mkdir/rm/readdir` | **BLOCKING** — 8 call sites |
+| `app/lib/stores/files.ts` | `webcontainer.fs.writeFile/readFile/mkdir/rm/readdir` | **BLOCKING** — 22 call sites across 3 files |
 | `app/lib/hooks/useGit.ts` | `isomorphic-git` with WebContainer FS proxy | **BLOCKING** |
 | `app/lib/runtime/action-runner.ts` | File write actions from AI | **BLOCKING** |
 | `app/components/workbench/Search.tsx` | Full-text search in WebContainer FS | **BLOCKING** |
@@ -106,6 +106,9 @@ The good news: the **chat, AI provider, code generation, code editor, and settin
 | `app/components/chat/BaseChat.tsx` | `lg:flex-row`, `lg:min-w-[var(--chat-min-width)]` | Breaks below `lg` breakpoint (1024px) |
 | `app/components/chat/BaseChat.tsx` | `mt-[16vh]` for intro text | Excessive top margin on mobile |
 | `app/root.tsx` | `DndProvider` with `HTML5Backend` | **NO TOUCH** — HTML5 drag-drop doesn't work on touch devices |
+| `app/components/ui/ColorSchemeDialog.tsx` | `min-w-[480px]` | **TOO WIDE** — exceeds 360px viewport |
+| `app/components/ui/Dropdown.tsx` | `min-w-[220px]` | May be OK, but verify on small screens |
+| `app/components/workbench/FileBreadcrumb.tsx` | `min-w-[300px]` | Borderline — 300px on 360px screen |
 
 ### 2.7 Unsupported Android WebView APIs
 
@@ -127,7 +130,7 @@ The good news: the **chat, AI provider, code generation, code editor, and settin
 
 ### 2.8 Server-Side API Routes (Remix Loaders/Actions)
 
-The app has **34 API routes** that run server-side. In a Capacitor WebView, there is no server. These break:
+The app has **33 API routes** that run server-side. In a Capacitor WebView, there is no server. These break:
 
 | Route | Purpose | Critical? |
 |-------|---------|-----------|
@@ -165,7 +168,7 @@ The app has **34 API routes** that run server-side. In a Capacitor WebView, ther
 Browser (Chrome with COOP/COEP)
   └── Remix App
        ├── Server (Cloudflare Pages / Wrangler)
-       │    └── 34 API routes
+       │    └── 33 API routes
        └── Client
             ├── WebContainer (Node.js in browser)
             │    ├── Filesystem
@@ -204,7 +207,7 @@ Android WebView (Capacitor)
 | React DnD doesn't work on touch | **MEDIUM** | Phase 2: Switch to `react-dnd-touch-backend` or remove |
 | `ScreenshotSelector` uses `getDisplayMedia` | **LOW** | Hide feature on mobile |
 | SpeechRecognition unreliable | **LOW** | Feature-detect and hide if unavailable |
-| 34 API routes need server or replacement | **HIGH** | Phase 5: Remote proxy or native HTTP |
+| 33 API routes need server or replacement | **HIGH** | Phase 5: Remote proxy or native HTTP |
 | `--chat-min-width: 533px` forces scroll | **HIGH** | Phase 2: Override to `100%` on mobile |
 | ControlPanel 1200px modal | **MEDIUM** | Phase 2: Responsive `w-full max-w-[1200px]` |
 | `isomorphic-git` needs FS backend | **MEDIUM** | Phase 3: InMemoryFS adapter |
