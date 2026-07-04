@@ -8,6 +8,7 @@ import { createHead } from 'remix-island';
 import { useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { TouchBackend } from 'react-dnd-touch-backend';
 import { ClientOnly } from 'remix-utils/client-only';
 import { cssTransition, ToastContainer } from 'react-toastify';
 
@@ -64,12 +65,35 @@ const inlineThemeCode = stripIndents`
 export const Head = createHead(() => (
   <>
     <meta charSet="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <Meta />
     <Links />
     <script dangerouslySetInnerHTML={{ __html: inlineThemeCode }} />
   </>
 ));
+
+/**
+ * Pick the right DnD backend at runtime:
+ *   - TouchBackend on touch devices (Android, phones, tablets)
+ *   - HTML5Backend on desktop (mouse-based drag-and-drop)
+ *
+ * TouchBackend supports both touch and mouse, so we use it whenever
+ * a touch pointer is detected. This fixes drag-and-drop for file tree
+ * reordering, chat message interactions, etc. on Android WebView.
+ */
+function getDndBackend() {
+  if (typeof window === 'undefined') {
+    return HTML5Backend;
+  }
+
+  const hasTouch =
+    'ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0 || window.matchMedia('(pointer: coarse)').matches;
+
+  return hasTouch ? TouchBackend : HTML5Backend;
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const theme = useStore(themeStore);
@@ -80,7 +104,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <ClientOnly>{() => <DndProvider backend={HTML5Backend}>{children}</DndProvider>}</ClientOnly>
+      <ClientOnly>{() => <DndProvider backend={getDndBackend()}>{children}</DndProvider>}</ClientOnly>
       <ToastContainer
         closeButton={({ closeToast }) => {
           return (

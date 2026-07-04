@@ -253,3 +253,23 @@
   --bolt-elements-terminal-color-brightCyan: var(--bolt-terminal-brightCyan);
   --bolt-elements-terminal-color-brightWhite: var(--bolt-terminal-brightWhite);
 }
+
+/*
+ * Mobile / Android WebView overrides
+ *
+ * Bolt.diy defaults to a desktop layout with --chat-min-width: 533px.
+ * On phones (max-width: 768px) this forces horizontal scroll. We override
+ * the CSS variables so chat and workbench each take the full viewport
+ * width, stacking vertically instead of side-by-side.
+ */
+@media (max-width: 768px) {
+  :root,
+  :root[data-theme='light'],
+  :root[data-theme='dark'] {
+    --header-height: 48px;
+    --chat-min-width: 100%;
+    --workbench-width: 100%;
+    --workbench-inner-width: 100%;
+    --workbench-left: 0;
+  }
+}

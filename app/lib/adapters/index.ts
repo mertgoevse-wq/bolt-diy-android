@@ -36,6 +36,7 @@ export function getAdapter(): PlatformAdapter {
   }
 
   console.log(`[PlatformAdapter] Using ${_adapter.getPlatformInfo().type} adapter`);
+
   return _adapter;
 }
 

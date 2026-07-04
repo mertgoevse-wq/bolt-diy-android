@@ -42,6 +42,7 @@ export function RuntimeModeBanner() {
 
   const handleDismiss = () => {
     setDismissed(true);
+
     try {
       localStorage.setItem(STORAGE_KEY_DISMISSED, 'true');
     } catch {
@@ -72,12 +73,7 @@ export function RuntimeModeBanner() {
         <div className="flex items-start gap-3 px-4 py-2.5 text-sm">
           {/* Icon */}
           <div className="flex-shrink-0 mt-0.5">
-            <div
-              className={classNames(
-                'i-ph:info-bold w-4 h-4',
-                'text-amber-600 dark:text-amber-400',
-              )}
-            />
+            <div className={classNames('i-ph:info-bold w-4 h-4', 'text-amber-600 dark:text-amber-400')} />
           </div>
 
           {/* Text */}

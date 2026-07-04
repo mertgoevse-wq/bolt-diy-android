@@ -19,6 +19,7 @@ export class TerminalStore {
     // Check if we're in fallback mode (Android/no WebContainer)
     if (!import.meta.env.SSR) {
       const wcSupported = isWebContainerSupported() && !isCapacitor();
+
       if (!wcSupported) {
         this.#isFallbackMode = true;
       }
@@ -75,7 +76,9 @@ export class TerminalStore {
   }
 
   onTerminalResize(cols: number, rows: number) {
-    if (this.#isFallbackMode) return;
+    if (this.#isFallbackMode) {
+      return;
+    }
 
     for (const { process } of this.#terminals) {
       process.resize({ cols, rows });

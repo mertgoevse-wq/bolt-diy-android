@@ -27,12 +27,7 @@ import { useStore } from '@nanostores/react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { classNames } from '~/utils/classNames';
-import {
-  githubSyncStore,
-  setSyncRepoUrl,
-  setSyncBranch,
-  isRepoConfigured,
-} from '~/lib/stores/github-sync';
+import { githubSyncStore, setSyncRepoUrl, setSyncBranch, isRepoConfigured } from '~/lib/stores/github-sync';
 import { runtimeModeStore } from '~/lib/stores/runtime-mode';
 import { useStore as useNanostore } from '@nanostores/react';
 
@@ -81,11 +76,18 @@ export function GitHubSyncPanel() {
         ? 'Set a Remote Runtime URL in Settings → Runtime Mode first'
         : 'Not yet implemented';
 
-  const isCommitDisabled = !isRepoConfigured() || (!gitAvailable && !isRemoteMode && !isWebContainerMode) || (isRemoteMode && !runtime.remoteRuntimeUrl) || true; // always disabled — not implemented
+  const isCommitDisabled =
+    !isRepoConfigured() ||
+    (!gitAvailable && !isRemoteMode && !isWebContainerMode) ||
+    (isRemoteMode && !runtime.remoteRuntimeUrl) ||
+    true; // always disabled — not implemented
   const isPushDisabled = isCommitDisabled;
 
   const formatTimestamp = (iso: string | null): string => {
-    if (!iso) return 'Never';
+    if (!iso) {
+      return 'Never';
+    }
+
     try {
       const date = new Date(iso);
       return date.toLocaleString();
@@ -97,11 +99,7 @@ export function GitHubSyncPanel() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <motion.div
-        className="flex items-center gap-2"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <motion.div className="flex items-center gap-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <GithubLogo className="w-5 h-5 text-bolt-elements-textPrimary" />
         <h2 className="text-lg font-medium text-bolt-elements-textPrimary">GitHub Sync</h2>
       </motion.div>
@@ -126,10 +124,7 @@ export function GitHubSyncPanel() {
 
       {/* Configuration */}
       <motion.div
-        className={classNames(
-          'rounded-lg shadow-sm dark:shadow-none p-4 space-y-4',
-          'bg-white dark:bg-[#0A0A0A]',
-        )}
+        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-4', 'bg-white dark:bg-[#0A0A0A]')}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
@@ -195,10 +190,7 @@ export function GitHubSyncPanel() {
 
       {/* Sync Status */}
       <motion.div
-        className={classNames(
-          'rounded-lg shadow-sm dark:shadow-none p-4 space-y-3',
-          'bg-white dark:bg-[#0A0A0A]',
-        )}
+        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-3', 'bg-white dark:bg-[#0A0A0A]')}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
@@ -255,10 +247,7 @@ export function GitHubSyncPanel() {
 
       {/* Actions */}
       <motion.div
-        className={classNames(
-          'rounded-lg shadow-sm dark:shadow-none p-4 space-y-3',
-          'bg-white dark:bg-[#0A0A0A]',
-        )}
+        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-3', 'bg-white dark:bg-[#0A0A0A]')}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -285,9 +274,7 @@ export function GitHubSyncPanel() {
             Commit Changes
           </button>
           {isCommitDisabled && (
-            <p className="text-xs text-bolt-elements-textSecondary mt-1.5 leading-relaxed">
-              {disabledReason}
-            </p>
+            <p className="text-xs text-bolt-elements-textSecondary mt-1.5 leading-relaxed">{disabledReason}</p>
           )}
         </div>
 
@@ -308,9 +295,7 @@ export function GitHubSyncPanel() {
             Push to GitHub
           </button>
           {isPushDisabled && (
-            <p className="text-xs text-bolt-elements-textSecondary mt-1.5 leading-relaxed">
-              {disabledReason}
-            </p>
+            <p className="text-xs text-bolt-elements-textSecondary mt-1.5 leading-relaxed">{disabledReason}</p>
           )}
         </div>
       </motion.div>

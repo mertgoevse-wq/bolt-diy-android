@@ -77,16 +77,16 @@ if (!import.meta.env.SSR) {
       import.meta.hot.data.webcontainer = webcontainer;
     }
   } else {
-    // Android / fallback mode — no WebContainer
-    // Export a rejected promise that stores can catch
+    /*
+     * Android / fallback mode — no WebContainer
+     * Export a rejected promise that stores can catch
+     */
     console.log(
       `[WebContainer] Not available on this platform (${isAndroid ? 'Android/Capacitor' : 'no SharedArrayBuffer'}). ` +
         'Using fallback adapter. Chat and code generation still work.',
     );
 
-    webcontainer = Promise.reject(
-      new Error('WebContainer is not available on this platform. Using fallback mode.'),
-    );
+    webcontainer = Promise.reject(new Error('WebContainer is not available on this platform. Using fallback mode.'));
 
     // Mark context as "loaded" so stores don't hang waiting
     webcontainerContext.loaded = true;

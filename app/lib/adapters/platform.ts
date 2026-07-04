@@ -14,10 +14,13 @@ import type { PlatformInfo, PlatformType } from './types';
  * Capacitor injects a global `capacitor` object.
  */
 export function isCapacitor(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') {
+    return false;
+  }
 
   // Capacitor injects this on Android
   const w = window as unknown as { capacitor?: unknown; AndroidCapacitor?: unknown };
+
   return !!(w.capacitor || w.AndroidCapacitor);
 }
 
@@ -25,8 +28,12 @@ export function isCapacitor(): boolean {
  * Detect if we're running in Electron.
  */
 export function isElectron(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
   const w = window as unknown as { electronAPI?: unknown };
+
   return !!w.electronAPI;
 }
 
@@ -36,11 +43,15 @@ export function isElectron(): boolean {
  * SharedArrayBuffer is typically not available.
  */
 export function hasSharedArrayBuffer(): boolean {
-  if (typeof SharedArrayBuffer === 'undefined') return false;
+  if (typeof SharedArrayBuffer === 'undefined') {
+    return false;
+  }
+
   // Even if SharedArrayBuffer exists, WebContainer needs cross-origin isolation
   if (typeof self !== 'undefined' && typeof (self as any).crossOriginIsolated !== 'undefined') {
     return (self as any).crossOriginIsolated;
   }
+
   return true;
 }
 
@@ -48,9 +59,18 @@ export function hasSharedArrayBuffer(): boolean {
  * Check if the current environment supports WebContainer.
  */
 export function isWebContainerSupported(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (isCapacitor()) return false;
-  if (isElectron()) return true; // Electron supports WebContainer
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  if (isCapacitor()) {
+    return false;
+  }
+
+  if (isElectron()) {
+    return true;
+  } // Electron supports WebContainer
+
   return hasSharedArrayBuffer();
 }
 
@@ -58,7 +78,9 @@ export function isWebContainerSupported(): boolean {
  * Check if we're on a mobile device (touch-first, small screen).
  */
 export function isMobileDevice(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') {
+    return false;
+  }
 
   const isCap = isCapacitor();
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -74,11 +96,15 @@ export function isMobileDevice(): boolean {
  * Check if we're specifically on Android.
  */
 export function isAndroidDevice(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
   if (isCapacitor()) {
     const ua = navigator.userAgent.toLowerCase();
     return ua.includes('android');
   }
+
   return /android/i.test(navigator.userAgent);
 }
 

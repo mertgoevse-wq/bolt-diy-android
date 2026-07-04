@@ -85,7 +85,13 @@ export default function RuntimeModeTab() {
   const handleUrlSave = useCallback(() => {
     const trimmed = urlInput.trim();
 
-    if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('ws://') && !trimmed.startsWith('wss://')) {
+    if (
+      trimmed &&
+      !trimmed.startsWith('http://') &&
+      !trimmed.startsWith('https://') &&
+      !trimmed.startsWith('ws://') &&
+      !trimmed.startsWith('wss://')
+    ) {
       toast.error('URL must start with http://, https://, ws://, or wss://');
       return;
     }
@@ -103,10 +109,7 @@ export default function RuntimeModeTab() {
     <div className="space-y-4">
       {/* Current Status */}
       <motion.div
-        className={classNames(
-          'rounded-lg shadow-sm dark:shadow-none p-4 space-y-3',
-          'bg-white dark:bg-[#0A0A0A]',
-        )}
+        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-3', 'bg-white dark:bg-[#0A0A0A]')}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
@@ -176,10 +179,7 @@ export default function RuntimeModeTab() {
 
       {/* Mode Selection */}
       <motion.div
-        className={classNames(
-          'rounded-lg shadow-sm dark:shadow-none p-4 space-y-3',
-          'bg-white dark:bg-[#0A0A0A]',
-        )}
+        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-3', 'bg-white dark:bg-[#0A0A0A]')}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
@@ -208,6 +208,7 @@ export default function RuntimeModeTab() {
                     e.preventDefault();
                     return;
                   }
+
                   handleModeChange(option.id);
                 }}
               >
@@ -318,10 +319,7 @@ export default function RuntimeModeTab() {
 
       {/* Capability Summary */}
       <motion.div
-        className={classNames(
-          'rounded-lg shadow-sm dark:shadow-none p-4 space-y-3',
-          'bg-white dark:bg-[#0A0A0A]',
-        )}
+        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-3', 'bg-white dark:bg-[#0A0A0A]')}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
@@ -352,7 +350,9 @@ export default function RuntimeModeTab() {
                     enabled ? 'text-green-500' : 'text-red-400',
                   )}
                 >
-                  <div className={classNames('w-3.5 h-3.5', enabled ? 'i-ph:check-circle-fill' : 'i-ph:x-circle-fill')} />
+                  <div
+                    className={classNames('w-3.5 h-3.5', enabled ? 'i-ph:check-circle-fill' : 'i-ph:x-circle-fill')}
+                  />
                 </div>
                 <span
                   className={classNames(
@@ -368,11 +368,7 @@ export default function RuntimeModeTab() {
       </motion.div>
 
       {/* Reset button */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
         <button
           onClick={handleReset}
           className={classNames(

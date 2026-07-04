@@ -24,10 +24,31 @@ class ShortcutEventEmitter {
 
 export const shortcutEventEmitter = new ShortcutEventEmitter();
 
+/**
+ * Detect touch-only / mobile environments where keyboard shortcuts
+ * (Ctrl/Cmd combinations) don't apply. On Android WebView, the soft
+ * keyboard doesn't have Ctrl/Cmd keys, so shortcut listeners just
+ * waste cycles and can intercept keypresses unpredictably.
+ */
+function isTouchOnlyDevice(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return (
+    'ontouchstart' in window && (navigator.maxTouchPoints ?? 0) > 0 && window.matchMedia('(pointer: coarse)').matches
+  );
+}
+
 export function useShortcuts(): void {
   const shortcuts = useStore(shortcutsStore);
 
   useEffect(() => {
+    // Skip keyboard shortcut registration on touch-only devices
+    if (isTouchOnlyDevice()) {
+      return undefined;
+    }
+
     const handleKeyDown = (event: KeyboardEvent): void => {
       // Don't trigger shortcuts when typing in input fields
       if (

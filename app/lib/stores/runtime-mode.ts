@@ -12,15 +12,13 @@
  */
 
 import { atom } from 'nanostores';
-import {
-  isWebContainerSupported,
-  isCapacitor,
-  getPlatformInfo,
-} from '~/lib/adapters/platform';
+import { isWebContainerSupported, isCapacitor, getPlatformInfo } from '~/lib/adapters/platform';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+/*
+ * ---------------------------------------------------------------------------
+ * Types
+ * ---------------------------------------------------------------------------
+ */
 
 export type RuntimeMode = 'webcontainer' | 'android-fallback' | 'remote';
 
@@ -52,9 +50,11 @@ export interface RuntimeModeState {
   autoDetected: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Detection logic
-// ---------------------------------------------------------------------------
+/*
+ * ---------------------------------------------------------------------------
+ * Detection logic
+ * ---------------------------------------------------------------------------
+ */
 
 function detectPlatform(): {
   isAndroid: boolean;
@@ -79,10 +79,7 @@ function detectPlatform(): {
   return { isAndroid, webContainerAvailable, defaultMode };
 }
 
-function getCapabilitiesForMode(
-  mode: RuntimeMode,
-  webContainerAvailable: boolean,
-): RuntimeModeState['capabilities'] {
+function getCapabilitiesForMode(mode: RuntimeMode, webContainerAvailable: boolean): RuntimeModeState['capabilities'] {
   if (mode === 'webcontainer' && webContainerAvailable) {
     return {
       fileSystem: true,
@@ -96,10 +93,12 @@ function getCapabilitiesForMode(
   }
 
   if (mode === 'remote') {
-    // Remote runtime — full capabilities (when implemented).
-    // For now, file system is local (in-memory) and runtime ops
-    // go through the remote URL. We mark all as available optimistically
-    // since the user explicitly chose this mode.
+    /*
+     * Remote runtime — full capabilities (when implemented).
+     * For now, file system is local (in-memory) and runtime ops
+     * go through the remote URL. We mark all as available optimistically
+     * since the user explicitly chose this mode.
+     */
     return {
       fileSystem: true,
       terminal: true,
@@ -123,9 +122,11 @@ function getCapabilitiesForMode(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Store
-// ---------------------------------------------------------------------------
+/*
+ * ---------------------------------------------------------------------------
+ * Store
+ * ---------------------------------------------------------------------------
+ */
 
 const STORAGE_KEY_REMOTE_URL = 'bolt_remote_runtime_url';
 const STORAGE_KEY_MODE_OVERRIDE = 'bolt_runtime_mode_override';
@@ -141,6 +142,7 @@ function loadSavedRemoteUrl(): string {
 function loadModeOverride(): RuntimeMode | null {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_MODE_OVERRIDE);
+
     if (saved === 'webcontainer' || saved === 'android-fallback' || saved === 'remote') {
       return saved;
     }
@@ -154,7 +156,9 @@ function resolveMode(
   detected: { isAndroid: boolean; webContainerAvailable: boolean; defaultMode: RuntimeMode },
   override: RuntimeMode | null,
 ): RuntimeMode {
-  if (!override) return detected.defaultMode;
+  if (!override) {
+    return detected.defaultMode;
+  }
 
   // On Android, user cannot force WebContainer mode
   if (detected.isAndroid && override === 'webcontainer') {
@@ -186,9 +190,11 @@ function createInitialState(): RuntimeModeState {
 
 export const runtimeModeStore = atom<RuntimeModeState>(createInitialState());
 
-// ---------------------------------------------------------------------------
-// Actions
-// ---------------------------------------------------------------------------
+/*
+ * ---------------------------------------------------------------------------
+ * Actions
+ * ---------------------------------------------------------------------------
+ */
 
 /**
  * Set the runtime mode. On Android, 'webcontainer' is rejected.

@@ -82,6 +82,7 @@ export class FilesStore {
     if (!import.meta.env.SSR) {
       this.#isFallbackMode = !isWebContainerSupported() || isCapacitor();
     }
+
     // Load deleted paths from localStorage if available
     try {
       if (typeof localStorage !== 'undefined') {
@@ -596,8 +597,10 @@ export class FilesStore {
   }
 
   async #init() {
-    // In fallback mode (Android/no WebContainer), skip WebContainer initialization
-    // but still handle locked files and cleanup
+    /*
+     * In fallback mode (Android/no WebContainer), skip WebContainer initialization
+     * but still handle locked files and cleanup
+     */
     if (this.#isFallbackMode) {
       console.log('[FilesStore] Running in fallback mode — no WebContainer file watching');
 
@@ -612,6 +615,7 @@ export class FilesStore {
       // Set up periodic lock refresh
       setInterval(() => {
         clearCache();
+
         const latestChatId = getCurrentChatId();
         this.#loadLockedFiles(latestChatId);
       }, 30000);
@@ -620,15 +624,18 @@ export class FilesStore {
     }
 
     let webcontainer: WebContainer;
+
     try {
       webcontainer = await this.#webcontainer;
     } catch (error) {
       console.warn('[FilesStore] WebContainer unavailable, entering fallback mode:', error);
       this.#isFallbackMode = true;
       this.#cleanupDeletedFiles();
+
       const currentChatId = getCurrentChatId();
       migrateLegacyLocks(currentChatId);
       this.#loadLockedFiles(currentChatId);
+
       return;
     }
 

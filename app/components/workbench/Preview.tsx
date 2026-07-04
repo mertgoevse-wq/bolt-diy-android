@@ -7,6 +7,7 @@ import { ScreenshotSelector } from './ScreenshotSelector';
 import { expoUrlAtom } from '~/lib/stores/qrCodeStore';
 import { ExpoQrModal } from '~/components/workbench/ExpoQrModal';
 import type { ElementInfo } from './Inspector';
+import { classNames } from '~/utils/classNames';
 
 type ResizeSide = 'left' | 'right' | null;
 
@@ -125,9 +126,17 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
 
   const toggleFullscreen = async () => {
     if (!isFullscreen && containerRef.current) {
-      await containerRef.current.requestFullscreen();
+      try {
+        await containerRef.current.requestFullscreen();
+      } catch {
+        // Fullscreen API may not be available in Capacitor WebView — use CSS fallback
+      }
+      setIsFullscreen(true);
     } else if (document.fullscreenElement) {
       await document.exitFullscreen();
+    } else {
+      // CSS-only fullscreen fallback (Capacitor WebView)
+      setIsFullscreen(false);
     }
   };
 
@@ -661,7 +670,10 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
   };
 
   return (
-    <div ref={containerRef} className={`w-full h-full flex flex-col relative`}>
+    <div
+      ref={containerRef}
+      className={classNames('w-full h-full flex flex-col relative', { 'mobile-preview-fullscreen': isFullscreen })}
+    >
       {isPortDropdownOpen && (
         <div className="z-iframe-overlay w-full h-full absolute" onClick={() => setIsPortDropdownOpen(false)} />
       )}
