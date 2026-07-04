@@ -150,6 +150,7 @@ bolt-diy-android/
 | LLM chat on Android | ❌ Not working | 33 server-side API routes have no server in WebView |
 | Mobile UI | ❌ Not started | Desktop layouts break at 360px (533px min-width, 1200px modal) |
 | APK build | ✅ Automated | `android:apk:debug` compiles the debug APK via Gradle wrapper |
+| Remote Runtime file sync | ✅ MVP complete | Explicit text-file push/pull/single-file sync; IndexedDB remains source of truth |
 | Device tested | ❌ Not yet | No physical device testing done |
 
 ---
@@ -160,17 +161,19 @@ bolt-diy-android/
 
 2. **Live preview fallback** — Dev server preview is unavailable without WebContainer/Remote Runtime, but a designed fallback view is shown, and the user can run a basic static preview of any local `index.html` file using local Blob URLs.
 
-3. **Terminal fallback** — The terminal cannot run a local shell process without WebContainer, but it now shows a designed fallback screen with redirection to Remote Runtime settings.
+3. **Terminal fallback** — The terminal cannot run a local shell process without WebContainer, but it now shows a designed fallback screen with redirection to Remote Runtime settings. Remote Runtime command execution is still stubbed and does not execute commands.
 
 4. **IndexedDB file persistence** — Files created by AI actions are saved to IndexedDB and restored on app restart. In-memory store is always in sync with IndexedDB.
 
-5. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
+5. **Remote Runtime file sync** — Phase 5.3 adds optional text-file sync to a trusted LAN server. Push sends all local IndexedDB text files; pull imports remote text files only after user action and keeps local files on conflict. Binary files are skipped with warnings.
 
-6. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
+6. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
 
-7. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
+7. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
 
-8. **Speech recognition unreliable** — `webkitSpeechRecognition` may not be available in all Android WebView versions.
+8. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
+
+9. **Speech recognition unreliable** — `webkitSpeechRecognition` may not be available in all Android WebView versions.
 
 10. **Android build workflow** — The Android build workflow is now fully automated. `npm run android:apk:debug` compiles the debug APK containing the fully functional SPA build.
 
@@ -186,6 +189,7 @@ bolt-diy-android/
 | Preview iframe | ✅ Complete | Designed fallback and local static HTML preview implemented |
 | Terminal process | ✅ Complete | Designed fallback and settings redirection implemented |
 | File system persistence | ✅ Complete | InMemoryFS with IndexedDB backing automatically saves and restores files |
+| Remote Runtime file sync | ✅ MVP complete | Text-only push/pull/current-file sync; local IndexedDB wins on conflict |
 | Git operations | FS backend missing | Phase 3: InMemoryFS for isomorphic-git. GitHub Sync panel saves config only |
 | Settings modal | 1200px fixed width | Phase 2: `w-full max-w-[1200px]` |
 | Chat layout | Forces 533px min width | Phase 2: responsive CSS override |

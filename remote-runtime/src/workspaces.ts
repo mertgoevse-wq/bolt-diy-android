@@ -34,9 +34,10 @@ export function getWorkspacePath(workspaceId: string): string {
   }
 
   const workspacePath = path.resolve(WORKSPACES_DIR, workspaceId);
+  const workspaceRoot = WORKSPACES_DIR.endsWith(path.sep) ? WORKSPACES_DIR : `${WORKSPACES_DIR}${path.sep}`;
 
   // Check traversal
-  if (!workspacePath.startsWith(WORKSPACES_DIR)) {
+  if (workspacePath !== WORKSPACES_DIR && !workspacePath.startsWith(workspaceRoot)) {
     throw new Error('Access denied: Path traversal detected.');
   }
 

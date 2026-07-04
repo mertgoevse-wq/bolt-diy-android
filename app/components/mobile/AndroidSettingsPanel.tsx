@@ -28,6 +28,14 @@ import { getAndroidFallbackPersistenceStatus } from '~/lib/persistence/androidFa
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
 import { RemoteRuntimeClient } from '~/lib/remote-runtime/RemoteRuntimeClient';
+import {
+  getMissingRemoteRuntimeConfig,
+  getSyncStatus,
+  pullRemoteWorkspaceToLocal,
+  pushLocalWorkspaceToRemote,
+  syncSingleFileToRemote,
+  type RemoteWorkspaceSyncStatus,
+} from '~/lib/remote-runtime/RemoteWorkspaceSync';
 
 interface PersistenceStatus {
   available: boolean;
@@ -49,6 +57,8 @@ export default function AndroidSettingsPanel() {
   const [connectionState, setConnectionState] = useState<'disconnected' | 'checking' | 'connected' | 'failed'>('disconnected');
   const [lastError, setLastError] = useState<string | null>(null);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [syncingAction, setSyncingAction] = useState<'push' | 'pull' | 'current-file' | null>(null);
+  const [syncStatus, setSyncStatus] = useState<RemoteWorkspaceSyncStatus>(() => getSyncStatus());
 
   useEffect(() => {
     setUrlInput(runtime.remoteRuntimeUrl);
@@ -157,6 +167,33 @@ export default function AndroidSettingsPanel() {
     }
   }, [urlInput, tokenInput]);
 
+  const runSyncAction = useCallback(async (action: 'push' | 'pull' | 'current-file') => {
+    setSyncingAction(action);
+
+    try {
+      const nextStatus = action === 'push'
+        ? await pushLocalWorkspaceToRemote()
+        : action === 'pull'
+          ? await pullRemoteWorkspaceToLocal()
+          : await syncSingleFileToRemote();
+
+      setSyncStatus(nextStatus);
+
+      if (nextStatus.state === 'error') {
+        toast.error(nextStatus.lastError ?? 'Remote Runtime sync failed');
+      } else if (nextStatus.conflictCount > 0) {
+        toast.warning(`Remote Runtime sync completed with ${nextStatus.conflictCount} conflict(s). Local files were kept.`);
+      } else {
+        toast.success('Remote Runtime sync completed');
+      }
+
+      const status = await getAndroidFallbackPersistenceStatus();
+      setPersistenceStatus(status);
+    } finally {
+      setSyncingAction(null);
+    }
+  }, []);
+
   const handleModeChange = useCallback(
     (mode: RuntimeMode) => {
       if (mode === 'remote' && !urlInput.trim()) {
@@ -214,6 +251,8 @@ export default function AndroidSettingsPanel() {
     : 'Remote Runtime Mode';
 
   const modeColor = runtime.mode === 'android-fallback' ? '#f59e0b' : '#10b981';
+  const missingRemoteConfig = getMissingRemoteRuntimeConfig();
+  const canUseRemoteSync = runtime.mode === 'remote' && missingRemoteConfig.length === 0;
 
   return (
     <div className="android-settings-panel">
@@ -281,7 +320,8 @@ export default function AndroidSettingsPanel() {
           </h2>
           <div className="android-card-content gap-3.5">
             <p className="text-xs text-bolt-elements-textSecondary leading-relaxed">
-              Remote Runtime lets Android run terminal commands and live previews on a trusted computer/server.
+              Remote Runtime can mirror local Android files to a trusted computer/server. Command execution is still disabled in this MVP.
+              On a phone, localhost points to the phone; use your laptop LAN IP, for example http://192.168.x.x:8787.
             </p>
 
             {/* URL Input */}
@@ -425,6 +465,75 @@ export default function AndroidSettingsPanel() {
                   </>
                 )}
               </button>
+            </div>
+
+            {/* File Sync */}
+            <div className="flex flex-col gap-2 mt-2 border-t border-bolt-elements-borderColor pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-bolt-elements-textPrimary">File Sync</span>
+                <span className={classNames('text-[10px] uppercase px-2 py-0.5 rounded-full border', {
+                  'bg-gray-500/10 border-gray-500/30 text-gray-400': syncStatus.state === 'idle',
+                  'bg-purple-500/10 border-purple-500/30 text-purple-400': syncStatus.state === 'syncing',
+                  'bg-green-500/10 border-green-500/30 text-green-400': syncStatus.state === 'success',
+                  'bg-red-500/10 border-red-500/30 text-red-400': syncStatus.state === 'error',
+                })}>
+                  {syncStatus.state}
+                </span>
+              </div>
+
+              {missingRemoteConfig.length > 0 && (
+                <div className="text-[10px] text-amber-400 bg-amber-950/20 border border-amber-900/50 rounded-lg p-2">
+                  Remote file sync needs: {missingRemoteConfig.join(', ')}.
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => runSyncAction('push')}
+                  disabled={!canUseRemoteSync || syncingAction !== null}
+                  className="android-secondary-btn text-[10px] font-semibold py-2 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className={syncingAction === 'push' ? 'i-ph:spinner-gap animate-spin' : 'i-ph:upload-simple-fill'} />
+                  <span>Sync workspace to Remote Runtime</span>
+                </button>
+                <button
+                  onClick={() => runSyncAction('pull')}
+                  disabled={!canUseRemoteSync || syncingAction !== null}
+                  className="android-secondary-btn text-[10px] font-semibold py-2 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className={syncingAction === 'pull' ? 'i-ph:spinner-gap animate-spin' : 'i-ph:download-simple-fill'} />
+                  <span>Pull remote files</span>
+                </button>
+                <button
+                  onClick={() => runSyncAction('current-file')}
+                  disabled={!canUseRemoteSync || syncingAction !== null}
+                  className="android-secondary-btn text-[10px] font-semibold py-2 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className={syncingAction === 'current-file' ? 'i-ph:spinner-gap animate-spin' : 'i-ph:file-arrow-up-fill'} />
+                  <span>Sync current file</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[10px] text-bolt-elements-textSecondary">
+                <span>Last sync: {syncStatus.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString() : 'Never'}</span>
+                <span>Synced files: {syncStatus.syncedFileCount}</span>
+                <span>Skipped files: {syncStatus.skippedFileCount}</span>
+                <span>Conflicts: {syncStatus.conflictCount}</span>
+              </div>
+
+              {syncStatus.lastError && (
+                <div className="text-[10px] text-red-400 bg-red-950/20 border border-red-900/50 rounded-lg p-2 break-all">
+                  <strong>Last error:</strong> {syncStatus.lastError}
+                </div>
+              )}
+
+              {syncStatus.warnings.length > 0 && (
+                <div className="text-[10px] text-amber-300 bg-amber-950/20 border border-amber-900/50 rounded-lg p-2">
+                  {syncStatus.warnings.slice(0, 3).map((warning) => (
+                    <div key={warning}>{warning}</div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>

@@ -1,13 +1,20 @@
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
+import fs from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import url from 'url';
 import dotenv from 'dotenv';
 
 import { requireAuth, validateToken } from './auth.js';
 import { createWorkspace, getWorkspacePath, isValidWorkspaceId } from './workspaces.js';
-import { listFilesRecursively, writeWorkspaceFiles, resolveSafeFilePath } from './files.js';
+import {
+  getWorkspaceFileMetadata,
+  getWorkspaceFilesWithContent,
+  listFilesRecursively,
+  readWorkspaceTextFile,
+  writeWorkspaceFiles,
+} from './files.js';
 
 dotenv.config();
 
@@ -20,6 +27,16 @@ const HOST = process.env.REMOTE_RUNTIME_HOST || '127.0.0.1';
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+function jsonError(res: express.Response, status: number, error: string) {
+  res.status(status).json({ ok: false, error });
+}
+
+function ensureWorkspaceExists(id: string) {
+  const workspacePath = getWorkspacePath(id);
+
+  return fs.existsSync(workspacePath);
+}
 
 /**
  * GET /health
@@ -40,10 +57,46 @@ app.post('/workspace', requireAuth, (req, res) => {
     const workspaceId = 'ws_' + Math.random().toString(36).substring(2, 11);
     createWorkspace(workspaceId);
     console.log(`[RemoteRuntime] Created workspace: ${workspaceId}`);
-    res.status(201).json({ workspaceId });
+    res.status(201).json({ workspaceId, createdAt: new Date().toISOString() });
   } catch (error: any) {
     console.error('[RemoteRuntime] Error creating workspace', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    jsonError(res, 500, error.message || 'Internal server error');
+  }
+});
+
+/**
+ * GET /workspace/:id/files/content?path=...
+ */
+app.get('/workspace/:id/files/content', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const filePath = typeof req.query.path === 'string' ? req.query.path : '';
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  if (!filePath) {
+    jsonError(res, 400, 'Missing required query parameter: path.');
+    return;
+  }
+
+  try {
+    res.status(200).json(readWorkspaceTextFile(id, filePath));
+  } catch (error: any) {
+    if (error.message.includes('Access denied')) {
+      jsonError(res, 403, error.message);
+    } else if (error.message.includes('not text-safe')) {
+      jsonError(res, 415, 'Only text-safe files can be read by the Remote Runtime file API.');
+    } else {
+      console.error(`[RemoteRuntime] Error reading file for ${id}`, error);
+      jsonError(res, 500, error.message || 'Internal server error');
+    }
   }
 });
 
@@ -52,21 +105,27 @@ app.post('/workspace', requireAuth, (req, res) => {
  */
 app.get('/workspace/:id/files', requireAuth, (req, res) => {
   const { id } = req.params;
+  const includeContent = req.query.includeContent === 'true';
 
   if (!isValidWorkspaceId(id)) {
-    res.status(400).json({ error: 'Invalid workspace ID format.' });
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
     return;
   }
 
   try {
-    const files = listFilesRecursively(id);
+    const files = includeContent ? getWorkspaceFilesWithContent(id) : listFilesRecursively(id);
     res.status(200).json({ files });
   } catch (error: any) {
     if (error.message.includes('Access denied')) {
-      res.status(403).json({ error: error.message });
+      jsonError(res, 403, error.message);
     } else {
       console.error(`[RemoteRuntime] Error listing files for ${id}`, error);
-      res.status(500).json({ error: error.message || 'Internal server error' });
+      jsonError(res, 500, error.message || 'Internal server error');
     }
   }
 });
@@ -79,24 +138,41 @@ app.put('/workspace/:id/files', requireAuth, (req, res) => {
   const { files } = req.body;
 
   if (!isValidWorkspaceId(id)) {
-    res.status(400).json({ error: 'Invalid workspace ID format.' });
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
     return;
   }
 
   if (!files || typeof files !== 'object') {
-    res.status(400).json({ error: 'Invalid payload: "files" object is required.' });
+    jsonError(res, 400, 'Invalid payload: "files" object is required.');
+    return;
+  }
+
+  if (Array.isArray(files)) {
+    jsonError(res, 400, 'Invalid payload: "files" must be an object keyed by relative path.');
     return;
   }
 
   try {
     writeWorkspaceFiles(id, files);
-    res.status(200).json({ ok: true });
+    const filePaths = Object.keys(files);
+    res.status(200).json({
+      ok: true,
+      writtenFileCount: filePaths.length,
+      files: getWorkspaceFileMetadata(id, filePaths),
+    });
   } catch (error: any) {
     if (error.message.includes('Access denied')) {
-      res.status(403).json({ error: error.message });
+      jsonError(res, 403, error.message);
+    } else if (error.message.includes('Invalid payload') || error.message.includes('Invalid file path')) {
+      jsonError(res, 400, error.message);
     } else {
       console.error(`[RemoteRuntime] Error writing files for ${id}`, error);
-      res.status(500).json({ error: error.message || 'Internal server error' });
+      jsonError(res, 500, error.message || 'Internal server error');
     }
   }
 });
@@ -108,7 +184,12 @@ app.get('/workspace/:id/preview', requireAuth, (req, res) => {
   const { id } = req.params;
 
   if (!isValidWorkspaceId(id)) {
-    res.status(400).json({ error: 'Invalid workspace ID format.' });
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
     return;
   }
 
@@ -138,7 +219,19 @@ app.get('/workspace/:id/preview', requireAuth, (req, res) => {
  * POST /workspace/:id/commands (Stub)
  */
 app.post('/workspace/:id/commands', requireAuth, (req, res) => {
-  res.status(200).json({
+  const { id } = req.params;
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  res.status(202).json({
     commandId: 'cmd_mock_' + Math.random().toString(36).substring(2, 11),
     message: 'Command execution stub registered. Safety filters active; no actions performed.',
   });

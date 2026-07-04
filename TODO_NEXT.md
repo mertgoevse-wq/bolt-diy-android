@@ -1,7 +1,7 @@
 # TODO: Next Steps for Android Port
 
 **Last updated:** 2026-07-04
-**Current phase:** Phase 0, 1, 3, 4, 5, 6 (debug compile) complete; Phase 2 (mobile UI) next.
+**Current phase:** Phase 0, 1, 3, 4, 5.3, 6 (debug compile) complete; Phase 2 (mobile UI) and Phase 5b (AI provider integration) next.
 
 ---
 
@@ -124,6 +124,29 @@
 - [x] Integrate Auth Token, Workspace ID, and URL fields in Runtime Settings UI
 - [x] Add connection testing trigger checking GET /health
 - [x] **Commit:** `feat: scaffold remote runtime client`
+
+---
+
+## Phase 5.3: Remote Runtime File Sync MVP ✅ DONE
+
+**Goal:** Sync local Android IndexedDB text files to/from an optional Remote Runtime without enabling shell command execution.
+
+- [x] Create `app/lib/remote-runtime/RemoteWorkspaceSync.ts`
+  - [x] `pushLocalWorkspaceToRemote()`
+  - [x] `pullRemoteWorkspaceToLocal()`
+  - [x] `syncSingleFileToRemote()`
+  - [x] `getSyncStatus()`
+  - [x] `resetSyncStatus()`
+- [x] Keep IndexedDB local Android storage as the source of truth
+- [x] Push all local text files to Remote Runtime
+- [x] Pull remote text files only after user action
+- [x] Keep local files by default on conflict and record conflicts in sync status
+- [x] Skip binary files with clear warnings
+- [x] Strengthen `RemoteRuntimeClient.ts` list/read/write/sync typings and errors
+- [x] Harden remote-runtime file API for nested directories, path traversal, JSON errors, and text-safe payloads
+- [x] Add sync controls/status to Android Settings and Runtime Mode UI
+- [x] Update docs with LAN setup guidance: `REMOTE_RUNTIME_HOST=0.0.0.0`, `REMOTE_RUNTIME_PORT=8787`, and `http://192.168.x.x:8787`
+- [x] **Commit:** `feat: add remote runtime file sync`
 
 ---
 

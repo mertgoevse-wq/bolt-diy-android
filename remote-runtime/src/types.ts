@@ -6,12 +6,16 @@ export interface HealthResponse {
 
 export interface WorkspaceResponse {
   workspaceId: string;
+  createdAt: string;
 }
 
 export interface FileItem {
   path: string;
   type: 'file' | 'directory';
   size?: number;
+  modifiedAt?: string;
+  content?: string;
+  isBinary?: boolean;
 }
 
 export interface WorkspaceFilesResponse {
@@ -20,6 +24,12 @@ export interface WorkspaceFilesResponse {
 
 export interface SyncFilesRequest {
   files: Record<string, string>; // path -> content
+}
+
+export interface SyncFilesResponse {
+  ok: boolean;
+  writtenFileCount: number;
+  files: FileItem[];
 }
 
 export interface CommandRunRequest {

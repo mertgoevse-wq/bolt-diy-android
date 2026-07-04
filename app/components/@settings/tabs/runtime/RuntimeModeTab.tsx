@@ -7,9 +7,8 @@
  *   - Android Fallback Mode
  *   - Remote Runtime URL
  *
- * The remote URL input is saved to localStorage. The backend for
- * remote runtime is not implemented yet — this just saves the URL
- * for future use.
+ * Remote Runtime is optional. File sync is implemented as an explicit
+ * user action; command execution remains disabled/stubbed.
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -21,11 +20,21 @@ import {
   runtimeModeStore,
   setRuntimeMode,
   setRemoteRuntimeUrl,
+  setRemoteAuthToken,
+  setRemoteWorkspaceId,
   resetRuntimeMode,
   type RuntimeMode,
 } from '~/lib/stores/runtime-mode';
 import { getAndroidFallbackPersistenceStatus } from '~/lib/persistence/androidFallbackStorage';
 import { workbenchStore } from '~/lib/stores/workbench';
+import {
+  getMissingRemoteRuntimeConfig,
+  getSyncStatus,
+  pullRemoteWorkspaceToLocal,
+  pushLocalWorkspaceToRemote,
+  syncSingleFileToRemote,
+  type RemoteWorkspaceSyncStatus,
+} from '~/lib/remote-runtime/RemoteWorkspaceSync';
 
 interface ModeOption {
   id: RuntimeMode;
@@ -39,6 +48,10 @@ interface ModeOption {
 export default function RuntimeModeTab() {
   const runtime = useStore(runtimeModeStore);
   const [urlInput, setUrlInput] = useState(runtime.remoteRuntimeUrl);
+  const [tokenInput, setTokenInput] = useState(runtime.remoteAuthToken);
+  const [workspaceInput, setWorkspaceInput] = useState(runtime.remoteWorkspaceId);
+  const [syncingAction, setSyncingAction] = useState<'push' | 'pull' | 'current-file' | null>(null);
+  const [syncStatus, setSyncStatus] = useState<RemoteWorkspaceSyncStatus>(() => getSyncStatus());
   const [persistenceStatus, setPersistenceStatus] = useState({ available: false, hasSavedFiles: false, lastOpenedFile: undefined as string | undefined });
 
   useEffect(() => {
@@ -58,6 +71,18 @@ export default function RuntimeModeTab() {
       active = false;
     };
   }, [runtime.mode, runtime.isAndroid]);
+
+  useEffect(() => {
+    setUrlInput(runtime.remoteRuntimeUrl);
+  }, [runtime.remoteRuntimeUrl]);
+
+  useEffect(() => {
+    setTokenInput(runtime.remoteAuthToken);
+  }, [runtime.remoteAuthToken]);
+
+  useEffect(() => {
+    setWorkspaceInput(runtime.remoteWorkspaceId);
+  }, [runtime.remoteWorkspaceId]);
 
   const modes: ModeOption[] = [
     {
@@ -83,7 +108,7 @@ export default function RuntimeModeTab() {
       id: 'remote',
       label: 'Remote Runtime',
       description:
-        'Connect to a remote sandbox server for command execution, package install, and dev server. File editing stays local. Enter the remote runtime URL below.',
+        'Connect to a remote sandbox server for explicit file sync. Local IndexedDB files remain the source of truth. Command execution stays disabled.',
       icon: 'i-ph:cloud-fill',
       available: true,
     },
@@ -121,6 +146,43 @@ export default function RuntimeModeTab() {
     toast.success(trimmed ? 'Remote runtime URL saved' : 'Remote runtime URL cleared');
   }, [urlInput]);
 
+  const handleTokenSave = useCallback(() => {
+    setRemoteAuthToken(tokenInput.trim());
+    toast.success('Remote runtime auth token saved');
+  }, [tokenInput]);
+
+  const handleWorkspaceSave = useCallback(() => {
+    setRemoteWorkspaceId(workspaceInput.trim());
+    toast.success('Remote runtime workspace ID saved');
+  }, [workspaceInput]);
+
+  const runSyncAction = useCallback(async (action: 'push' | 'pull' | 'current-file') => {
+    setSyncingAction(action);
+
+    try {
+      const nextStatus = action === 'push'
+        ? await pushLocalWorkspaceToRemote()
+        : action === 'pull'
+          ? await pullRemoteWorkspaceToLocal()
+          : await syncSingleFileToRemote();
+
+      setSyncStatus(nextStatus);
+
+      if (nextStatus.state === 'error') {
+        toast.error(nextStatus.lastError ?? 'Remote Runtime sync failed');
+      } else if (nextStatus.conflictCount > 0) {
+        toast.warning(`Remote Runtime sync completed with ${nextStatus.conflictCount} conflict(s). Local files were kept.`);
+      } else {
+        toast.success('Remote Runtime sync completed');
+      }
+
+      const status = await getAndroidFallbackPersistenceStatus();
+      setPersistenceStatus(status);
+    } finally {
+      setSyncingAction(null);
+    }
+  }, []);
+
   const handleReset = useCallback(() => {
     resetRuntimeMode();
     toast.success('Runtime mode reset to auto-detected value');
@@ -137,6 +199,9 @@ export default function RuntimeModeTab() {
       toast.error('Unable to reset local Android workspace');
     }
   }, []);
+
+  const missingRemoteConfig = getMissingRemoteRuntimeConfig();
+  const canUseRemoteSync = runtime.mode === 'remote' && missingRemoteConfig.length === 0;
 
   return (
     <div className="space-y-4">
@@ -297,7 +362,7 @@ export default function RuntimeModeTab() {
         </div>
       </motion.div>
 
-      {/* Remote Runtime URL */}
+      {/* Remote Runtime */}
       <motion.div
         className={classNames(
           'rounded-lg shadow-sm dark:shadow-none p-4 space-y-3',
@@ -310,12 +375,12 @@ export default function RuntimeModeTab() {
       >
         <div className="flex items-center gap-2 mb-2">
           <div className="i-ph:link-fill w-4 h-4 text-purple-500" />
-          <span className="text-sm font-medium text-bolt-elements-textPrimary">Remote Runtime URL</span>
+          <span className="text-sm font-medium text-bolt-elements-textPrimary">Remote Runtime</span>
         </div>
 
         <p className="text-xs text-bolt-elements-textSecondary">
-          Enter the URL of a remote runtime server that provides command execution, package install, and dev server
-          capabilities. This is saved locally and will be used when Remote Runtime mode is active.
+          Remote Runtime currently syncs text files only. Local IndexedDB remains the source of truth. On Android,
+          localhost is the phone; use your laptop LAN IP such as http://192.168.x.x:8787.
         </p>
 
         <div className="flex gap-2">
@@ -323,7 +388,7 @@ export default function RuntimeModeTab() {
             type="text"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="https://runtime.example.com or wss://runtime.example.com/ws"
+            placeholder="http://192.168.x.x:8787"
             disabled={runtime.mode !== 'remote'}
             className={classNames(
               'flex-1 px-3 py-2 rounded-lg text-sm',
@@ -358,11 +423,118 @@ export default function RuntimeModeTab() {
           </div>
         )}
 
-        <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg p-2 flex items-start gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              placeholder="Auth token"
+              disabled={runtime.mode !== 'remote'}
+              className={classNames(
+                'flex-1 px-3 py-2 rounded-lg text-sm',
+                'bg-[#FAFAFA] dark:bg-[#0A0A0A]',
+                'border border-[#E5E5E5] dark:border-[#1A1A1A]',
+                'text-bolt-elements-textPrimary',
+                'focus:outline-none focus:ring-2 focus:ring-purple-500/30',
+                'transition-all duration-200',
+                'placeholder:text-bolt-elements-textTertiary',
+                'disabled:cursor-not-allowed',
+              )}
+            />
+            <button
+              onClick={handleTokenSave}
+              disabled={runtime.mode !== 'remote'}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-500 text-white hover:bg-purple-600 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={workspaceInput}
+              onChange={(e) => setWorkspaceInput(e.target.value)}
+              placeholder="Workspace ID"
+              disabled={runtime.mode !== 'remote'}
+              className={classNames(
+                'flex-1 px-3 py-2 rounded-lg text-sm',
+                'bg-[#FAFAFA] dark:bg-[#0A0A0A]',
+                'border border-[#E5E5E5] dark:border-[#1A1A1A]',
+                'text-bolt-elements-textPrimary',
+                'focus:outline-none focus:ring-2 focus:ring-purple-500/30',
+                'transition-all duration-200',
+                'placeholder:text-bolt-elements-textTertiary',
+                'disabled:cursor-not-allowed',
+              )}
+            />
+            <button
+              onClick={handleWorkspaceSave}
+              disabled={runtime.mode !== 'remote'}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-500 text-white hover:bg-purple-600 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+
+        {missingRemoteConfig.length > 0 && (
+          <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg p-2 flex items-start gap-2">
+            <div className="i-ph:info-fill w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            <span>Remote file sync needs: {missingRemoteConfig.join(', ')}.</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <button
+            onClick={() => runSyncAction('push')}
+            disabled={!canUseRemoteSync || syncingAction !== null}
+            className="px-3 py-2 rounded-lg text-xs font-medium border border-[#E5E5E5] dark:border-[#1A1A1A] text-bolt-elements-textPrimary hover:bg-gray-50 dark:hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            <div className={syncingAction === 'push' ? 'i-ph:spinner-gap animate-spin' : 'i-ph:upload-simple-fill'} />
+            <span>Sync workspace to Remote Runtime</span>
+          </button>
+          <button
+            onClick={() => runSyncAction('pull')}
+            disabled={!canUseRemoteSync || syncingAction !== null}
+            className="px-3 py-2 rounded-lg text-xs font-medium border border-[#E5E5E5] dark:border-[#1A1A1A] text-bolt-elements-textPrimary hover:bg-gray-50 dark:hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            <div className={syncingAction === 'pull' ? 'i-ph:spinner-gap animate-spin' : 'i-ph:download-simple-fill'} />
+            <span>Pull remote files</span>
+          </button>
+          <button
+            onClick={() => runSyncAction('current-file')}
+            disabled={!canUseRemoteSync || syncingAction !== null}
+            className="px-3 py-2 rounded-lg text-xs font-medium border border-[#E5E5E5] dark:border-[#1A1A1A] text-bolt-elements-textPrimary hover:bg-gray-50 dark:hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1.5"
+          >
+            <div className={syncingAction === 'current-file' ? 'i-ph:spinner-gap animate-spin' : 'i-ph:file-arrow-up-fill'} />
+            <span>Sync current file</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-bolt-elements-textSecondary">
+          <span>Last sync: {syncStatus.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString() : 'Never'}</span>
+          <span>Status: {syncStatus.state}</span>
+          <span>Synced: {syncStatus.syncedFileCount}</span>
+          <span>Skipped: {syncStatus.skippedFileCount}</span>
+        </div>
+
+        {syncStatus.lastError && (
+          <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 rounded-lg p-2 break-all">
+            Last error: {syncStatus.lastError}
+          </div>
+        )}
+
+        {syncStatus.conflictCount > 0 && (
+          <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded-lg p-2">
+            {syncStatus.conflictCount} conflict(s) found. Local files were kept by default.
+          </div>
+        )}
+
+        <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2 flex items-start gap-2">
           <div className="i-ph:info-fill w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
           <span>
-            The remote runtime backend is not yet implemented. The URL is saved for future use when the backend becomes
-            available.
+            Start the server with REMOTE_RUNTIME_HOST=0.0.0.0 and REMOTE_RUNTIME_PORT=8787 when testing from a phone.
           </span>
         </div>
       </motion.div>

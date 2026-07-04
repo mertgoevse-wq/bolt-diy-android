@@ -158,9 +158,9 @@ Open Settings → **Runtime Mode** to see the current runtime status and configu
 |------|-------------|
 | **WebContainer Browser Mode** | Full in-browser runtime. Only available on desktop browsers with SharedArrayBuffer + cross-origin isolation. Greyed out on Android. |
 | **Android Fallback Mode** | In-memory file system. Code editing and AI chat work. No terminal, dev server, or preview. This is the default on Android. |
-| **Remote Runtime** | Connect to a remote sandbox server for command execution, package install, and dev server. File editing stays local. Select this option and enter the remote URL to save it. |
+| **Remote Runtime** | Connect to a remote sandbox server for explicit text-file sync. File editing stays local and IndexedDB remains the source of truth. Command execution is still disabled in the MVP. |
 
-The settings card lets you save the **Remote Runtime URL**, **Auth Token**, and **Workspace ID**. You can click **Test Connection** to check if the server is healthy, or **Create Workspace** to generate a sandboxed folder on the server.
+The settings card lets you save the **Remote Runtime URL**, **Auth Token**, and **Workspace ID**. You can click **Test Connection** to check if the server is healthy, **Create Workspace** to generate a sandboxed folder, **Sync workspace to Remote Runtime** to push all local text files, **Pull remote files** to import missing remote text files after user action, or **Sync current file** to push the open editor file.
 
 ### Setting up the Remote Runtime locally
 
@@ -169,9 +169,11 @@ To use the Remote Runtime with your Android device:
 1. **Start the Server on your Computer**:
    From the repository root on your laptop/computer, configure a `.env` file (e.g., `REMOTE_RUNTIME_TOKEN=change-me`) and run:
    ```bash
+   set REMOTE_RUNTIME_HOST=0.0.0.0
+   set REMOTE_RUNTIME_PORT=8787
    npm run runtime:dev
    ```
-   This boots the Express server on `http://127.0.0.1:8787`.
+   This boots the Express server on `http://0.0.0.0:8787`, reachable from your phone through the laptop LAN IP.
 
 2. **Find your Computer's Local IP**:
    - On Windows: Open Command Prompt and run `ipconfig` (look for `IPv4 Address` under your Wi-Fi/Ethernet adapter, e.g. `192.168.1.123`).
@@ -183,6 +185,11 @@ To use the Remote Runtime with your Android device:
      *Note: Using `http://localhost:8787` or `http://127.0.0.1:8787` inside the phone app will fail because the mobile WebView resolves it to the phone device itself.*
    - Set **Auth Token** to the value configured on your server (e.g. `change-me`).
    - Tap **Save** on both, then click **Test Connection** to verify health status, and finally tap **Create Workspace** to configure a sandbox!
+
+4. **Sync Files Explicitly**:
+   - Use **Sync workspace to Remote Runtime** to push all local text files from IndexedDB.
+   - Use **Pull remote files** only when you want to copy remote files into local fallback storage. Local files win if contents differ.
+   - Binary files are skipped for now and shown in the sync status warnings.
 
 ### Capability Matrix
 

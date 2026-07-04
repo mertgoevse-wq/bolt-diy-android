@@ -6,7 +6,7 @@ This document details the architecture, secure communication model, API contract
 
 ## 1. Overview & Architecture
 
-Since WebContainer and native command execution are unavailable in standard mobile WebViews, bolt.diy Android relies on a **Remote Runtime Server** to execute terminal actions, install packages, and serve live previews.
+Since WebContainer and native command execution are unavailable in standard mobile WebViews, bolt.diy Android can optionally connect to a **Remote Runtime Server**. Phase 5.3 implements a file-sync MVP only: Android IndexedDB remains the local source of truth, text files can be pushed/pulled explicitly, and command execution remains stubbed.
 
 ```mermaid
 sequenceDiagram
@@ -21,17 +21,9 @@ sequenceDiagram
     Server->>Docker: Write files to sandbox folder
     Server-->>App: 200 OK
 
-    App->>Server: WS /workspace/:id/events (Establish shell channel)
-    Server-->>App: Connection Upgrade (Authenticated)
-
-    App->>Server: WS Send (command: "npm run dev")
-    Server->>Docker: Spawn command in shell
-    Docker-->>Server: stdout/stderr output stream
-    Server-->>App: WS Send (output stream)
-    
-    Docker->>Server: Port 5173 open (Preview server)
-    Server->>Server: Setup tunnel / local preview route
-    Server-->>App: WS Send (preview_url: "https://tunnel.url/ws-123")
+    App->>Server: GET /workspace/:id/files?includeContent=true
+    Server-->>App: Remote file metadata and text content
+    App->>App: User-initiated pull writes missing files to IndexedDB
 ```
 
 ---
@@ -76,16 +68,60 @@ All REST endpoints require the HTTP Header: `Authorization: Bearer <token>`.
     ```
 
 #### `GET /workspace/:id/files`
-- **Description:** Retrieves the list of files and metadata in the remote workspace.
-- **Response:** `200 OK` with JSON file tree.
+- **Description:** Retrieves remote file metadata. Add `?includeContent=true` to include text-safe file contents.
+- **Response:** `200 OK`
+  ```json
+  {
+    "files": [
+      {
+        "path": "src/App.tsx",
+        "type": "file",
+        "size": 1200,
+        "modifiedAt": "2026-07-04T18:13:00.000Z",
+        "content": "export default function App() {}",
+        "isBinary": false
+      }
+    ]
+  }
+  ```
+
+#### `GET /workspace/:id/files/content?path=src/App.tsx`
+- **Description:** Reads a single text-safe file from the remote workspace.
+- **Response:** `200 OK`
+  ```json
+  {
+    "path": "src/App.tsx",
+    "content": "export default function App() {}",
+    "size": 1200,
+    "modifiedAt": "2026-07-04T18:13:00.000Z"
+  }
+  ```
 
 #### `PUT /workspace/:id/files`
-- **Description:** Syncs files from the local SQLite/IndexedDB store to the remote workspace.
-- **Request Body:** Multi-part file stream or JSON file mapping.
-- **Response:** `200 OK`.
+- **Description:** Syncs text files from the local IndexedDB-backed Android workspace to the remote workspace.
+- **Request Body:** JSON file mapping only.
+  ```json
+  {
+    "files": {
+      "index.html": "<h1>Hello</h1>",
+      "src/main.ts": "console.log('hello')"
+    }
+  }
+  ```
+- **Response:** `200 OK`
+  ```json
+  {
+    "ok": true,
+    "writtenFileCount": 2,
+    "files": [
+      { "path": "index.html", "type": "file", "size": 14, "modifiedAt": "2026-07-04T18:13:00.000Z" }
+    ]
+  }
+  ```
+- **MVP constraints:** nested directories are supported, path traversal is blocked, and non-text-safe payloads are rejected.
 
 #### `POST /workspace/:id/commands`
-- **Description:** Direct trigger for short-running commands (e.g. `npm install`).
+- **Description:** Stub only. No shell command is executed in Phase 5.3.
 - **Request Body:**
   ```json
   {
@@ -164,7 +200,7 @@ The remote runtime package resides in `remote-runtime/`.
    ```env
    REMOTE_RUNTIME_TOKEN=change-me
    REMOTE_RUNTIME_PORT=8787
-   REMOTE_RUNTIME_HOST=127.0.0.1
+   REMOTE_RUNTIME_HOST=0.0.0.0
    ```
 
 2. **Boot the Server:**
@@ -172,6 +208,8 @@ The remote runtime package resides in `remote-runtime/`.
    ```bash
    npm run runtime:dev
    ```
+
+When testing from a phone, `localhost` and `127.0.0.1` point to the phone, not your laptop. Use the laptop LAN IP in Android settings, for example `http://192.168.x.x:8787`.
 
 ### 4.2 Verifying Endpoints
 
@@ -190,3 +228,10 @@ The remote runtime package resides in `remote-runtime/`.
    curl -i -X PUT -H "Authorization: Bearer change-me" -H "Content-Type: application/json" -d '{"files": {"index.html": "<h1>Hello</h1>"}}' http://127.0.0.1:8787/workspace/ws_example123/files
    ```
 
+## 5. File Sync Semantics
+
+- Push: sends all local IndexedDB text files to Remote Runtime.
+- Pull: reads the remote file list/content and writes only missing or identical files into local fallback storage after the user presses Pull.
+- Conflict policy: local wins by default. If a local text file differs from remote content, the pull records a conflict and keeps the IndexedDB copy.
+- Binary files: skipped for now with warnings in sync status.
+- Desktop/WebContainer mode: unchanged; Remote Runtime remains optional.

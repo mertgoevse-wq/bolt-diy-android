@@ -9,6 +9,32 @@ export interface WorkspaceResponse {
   createdAt: string;
 }
 
+export interface RemoteFileItem {
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  modifiedAt?: string;
+  content?: string;
+  isBinary?: boolean;
+}
+
+export interface ListFilesResponse {
+  files: RemoteFileItem[];
+}
+
+export interface SyncFilesResponse {
+  ok: boolean;
+  writtenFileCount: number;
+  files: RemoteFileItem[];
+}
+
+export interface ReadFileResponse {
+  path: string;
+  content: string;
+  size: number;
+  modifiedAt: string;
+}
+
 /**
  * RemoteRuntimeClient
  *
@@ -40,20 +66,63 @@ export class RemoteRuntimeClient {
     return headers;
   }
 
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    let response: Response;
+
+    try {
+      response = await fetch(`${this.serverUrl}${path}`, {
+        ...init,
+        headers: {
+          ...this.getHeaders(),
+          ...(init.headers ?? {}),
+        },
+      });
+    } catch (error) {
+      throw new Error(
+        `Network failure contacting Remote Runtime at ${this.serverUrl}. Check that the server is reachable from this device.`,
+      );
+    }
+
+    if (!response.ok) {
+      const detail = await this.readErrorDetail(response);
+      throw new Error(this.formatHttpError(response.status, detail));
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  private async readErrorDetail(response: Response): Promise<string | undefined> {
+    try {
+      const payload = await response.json() as { error?: string; message?: string };
+      return payload.error ?? payload.message;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private formatHttpError(status: number, detail?: string): string {
+    const suffix = detail ? ` ${detail}` : '';
+
+    if (status === 401 || status === 403) {
+      return `Remote Runtime authentication failed (${status}). Check the auth token.${suffix}`;
+    }
+
+    if (status === 404) {
+      return `Remote Runtime endpoint or workspace was not found (404). Check the server URL and workspace ID.${suffix}`;
+    }
+
+    if (status >= 500) {
+      return `Remote Runtime server error (${status}). Check the server logs.${suffix}`;
+    }
+
+    return `Remote Runtime request failed (${status}).${suffix}`;
+  }
+
   /**
    * Health Check: GET /health
    */
   async checkHealth(): Promise<HealthResponse> {
-    const response = await fetch(`${this.serverUrl}/health`, {
-      method: 'GET',
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Health check failed with status: ${response.status}`);
-    }
-
-    return response.json() as Promise<HealthResponse>;
+    return this.request<HealthResponse>('/health', { method: 'GET' });
   }
 
   /**
@@ -67,17 +136,11 @@ export class RemoteRuntimeClient {
    * Workspace Creation: POST /workspace
    */
   async createWorkspace(template: string = 'node-clean'): Promise<WorkspaceResponse> {
-    const response = await fetch(`${this.serverUrl}/workspace`, {
+    const data = await this.request<WorkspaceResponse>('/workspace', {
       method: 'POST',
-      headers: this.getHeaders(),
       body: JSON.stringify({ template }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Workspace creation failed with status: ${response.status}`);
-    }
-
-    const data = await response.json() as WorkspaceResponse;
     this.workspaceId = data.workspaceId;
     return data;
   }
@@ -85,47 +148,49 @@ export class RemoteRuntimeClient {
   /**
    * List Files: GET /workspace/:id/files
    */
-  async listFiles(): Promise<any> {
+  async listFiles(options: { includeContent?: boolean } = {}): Promise<ListFilesResponse> {
     if (!this.workspaceId) {
       throw new Error('Workspace ID is not set.');
     }
 
-    const response = await fetch(`${this.serverUrl}/workspace/${this.workspaceId}/files`, {
-      method: 'GET',
-      headers: this.getHeaders(),
-    });
+    const query = options.includeContent ? '?includeContent=true' : '';
 
-    if (!response.ok) {
-      throw new Error(`Listing remote files failed: ${response.status}`);
-    }
-
-    return response.json();
+    return this.request<ListFilesResponse>(`/workspace/${this.workspaceId}/files${query}`, { method: 'GET' });
   }
 
   /**
    * Sync Files: PUT /workspace/:id/files
    */
-  async syncFiles(files: Record<string, string>): Promise<void> {
+  async syncFiles(files: Record<string, string>): Promise<SyncFilesResponse> {
     if (!this.workspaceId) {
       throw new Error('Workspace ID is not set.');
     }
 
-    const response = await fetch(`${this.serverUrl}/workspace/${this.workspaceId}/files`, {
+    return this.request<SyncFilesResponse>(`/workspace/${this.workspaceId}/files`, {
       method: 'PUT',
-      headers: this.getHeaders(),
       body: JSON.stringify({ files }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Files syncing failed: ${response.status}`);
-    }
   }
 
   /**
    * Write Single File: PUT /workspace/:id/files
    */
-  async writeFile(filePath: string, content: string): Promise<void> {
-    await this.syncFiles({ [filePath]: content });
+  async writeFile(filePath: string, content: string): Promise<SyncFilesResponse> {
+    return this.syncFiles({ [filePath]: content });
+  }
+
+  /**
+   * Read Single File: GET /workspace/:id/files/content?path=...
+   */
+  async readFile(filePath: string): Promise<ReadFileResponse> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    return this.request<ReadFileResponse>(
+      `/workspace/${this.workspaceId}/files/content?path=${encodeURIComponent(filePath)}`,
+      { method: 'GET' },
+    );
   }
 
   /**

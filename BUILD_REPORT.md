@@ -186,6 +186,60 @@ To provide a seamless experience on mobile where WebContainer features (like she
 - **Client SDK**: Implemented `app/lib/remote-runtime/RemoteRuntimeClient.ts` to manage workspace sync, health status tests, single-file writes, and WebSocket connections.
 - **Settings UI**: Connected Android Settings tab to trigger live GET `/health` calls (Test Connection) and POST `/workspace` calls (Create Workspace) with real-time connection state indicators (`disconnected` / `checking` / `connected` / `failed`) and detailed error rendering.
 
+## Phase 5.3 Audit: Remote Runtime File Sync MVP
+
+### Present Files
+
+| File | State |
+|------|-------|
+| `app/lib/remote-runtime/RemoteRuntimeClient.ts` | Present; extended with typed list/read/write/sync responses and clearer HTTP/network errors |
+| `app/lib/remote-runtime/RemoteWorkspaceSync.ts` | Added in this run |
+| `app/lib/persistence/androidFallbackStorage.ts` | Present; used as the local source of truth for sync |
+| `app/components/mobile/AndroidSettingsPanel.tsx` | Present; extended with file-sync controls/status |
+| `app/components/@settings/tabs/runtime/RuntimeModeTab.tsx` | Present; extended with Remote Runtime token/workspace fields and file-sync controls/status |
+| `remote-runtime/src/server.ts` | Present; extended file API while keeping command execution stubbed |
+| `remote-runtime/src/files.ts` | Present; extended safe path resolution, metadata, text-only reads/writes |
+| `docs/REMOTE_RUNTIME.md` | Present; updated for file-sync MVP and LAN setup |
+| `README_ANDROID.md` | Present; updated with Remote Runtime sync usage |
+| `CURRENT_STATUS.md` | Present; updated with Phase 5.3 status |
+| `TODO_NEXT.md` | Present; updated with Phase 5.3 completion checklist |
+
+### Missing Files
+
+No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing at the start of this run and is now present.
+
+### Partially Implemented Pieces Found
+
+- `RemoteRuntimeClient.ts` existed with health/workspace/list/sync/write methods, but list/sync were loosely typed and errors only exposed raw status codes.
+- `remote-runtime/src/files.ts` had an uncommitted helper for reading workspace files, but it was incomplete for the MVP API shape and needed text-safety/path-boundary hardening.
+- `remote-runtime/src/server.ts` had an uncommitted import for that helper, but no content-list/read endpoint behavior was wired yet.
+- Android settings had Remote Runtime URL/token/workspace creation controls, but no push/pull/current-file sync actions or sync status display.
+- Runtime Mode tab still described the remote backend as future-only.
+
+### Exact Changes Made In This Run
+
+- Added `RemoteWorkspaceSync.ts` with `pushLocalWorkspaceToRemote()`, `pullRemoteWorkspaceToLocal()`, `syncSingleFileToRemote()`, `getSyncStatus()`, and `resetSyncStatus()`.
+- Kept IndexedDB fallback storage as the local source of truth; pull keeps local files on conflict and records conflict details.
+- Added binary/non-text skip warnings and synced/skipped/conflict/error status fields.
+- Strengthened `RemoteRuntimeClient.ts` with typed file metadata, `readFile()`, typed `syncFiles()`, and clearer 401/403/404/500/network errors.
+- Hardened the remote file API for nested directories, path traversal, JSON errors, text-only payloads, metadata responses, `includeContent=true`, and single-file reads.
+- Left command execution as a stub; no shell command execution was implemented.
+- Added Remote Runtime file-sync controls/status to Android Settings and Runtime Mode UI.
+- Updated Remote Runtime docs, Android guide, current status, TODO list, and this audit.
+
+### Verification In This Run
+
+| Command / Check | Result |
+|-----------------|--------|
+| `npm install --legacy-peer-deps` | ✅ Passed; npm reported existing audit issues and Node engine warnings for some Cloudflare/Electron packages |
+| `npm run typecheck` | ✅ Passed |
+| `npm run android:webbuild` | ✅ Passed; existing Vite/chunk/icon warnings only |
+| `npm run android:sync` | ✅ Passed; Capacitor sync completed |
+| `npm --prefix remote-runtime install` | ✅ Passed |
+| `npm --prefix remote-runtime run build` | ✅ Passed |
+| `npm run runtime:dev` health smoke | ✅ Passed; `/health` returned `ok: true` |
+| Remote Runtime file API smoke | ✅ Passed; workspace create, nested text write, include-content list, single-file read, and traversal rejection (`403`) verified |
+
 ---
 
 ## Remaining Limitations
