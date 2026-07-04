@@ -1,5 +1,5 @@
 import type { TabType } from './types';
-import { User, Settings, Bell, Star, Database, Cloud, Laptop, Github, Wrench, List } from 'lucide-react';
+import { User, Settings, Bell, Star, Database, Cloud, Laptop, Github, Wrench, List, Cpu } from 'lucide-react';
 
 // GitLab icon component
 const GitLabIcon = () => (
@@ -52,6 +52,7 @@ export const TAB_ICONS: Record<TabType, React.ComponentType<{ className?: string
   vercel: () => <VercelIcon />,
   supabase: () => <SupabaseIcon />,
   'event-logs': List,
+  runtime: Cpu,
   mcp: Wrench,
 };
 
@@ -69,6 +70,7 @@ export const TAB_LABELS: Record<TabType, string> = {
   vercel: 'Vercel',
   supabase: 'Supabase',
   'event-logs': 'Event Logs',
+  runtime: 'Runtime Mode',
   mcp: 'MCP Servers',
 };
 
@@ -86,6 +88,7 @@ export const TAB_DESCRIPTIONS: Record<TabType, string> = {
   vercel: 'Manage Vercel projects and deployments',
   supabase: 'Setup Supabase database connection',
   'event-logs': 'View system events and logs',
+  runtime: 'Configure runtime mode (WebContainer, Android fallback, or remote)',
   mcp: 'Configure MCP (Model Context Protocol) servers',
 };
 
@@ -102,7 +105,8 @@ export const DEFAULT_TAB_CONFIG = [
   { id: 'supabase', visible: true, window: 'user' as const, order: 8 },
   { id: 'notifications', visible: true, window: 'user' as const, order: 9 },
   { id: 'event-logs', visible: true, window: 'user' as const, order: 10 },
-  { id: 'mcp', visible: true, window: 'user' as const, order: 11 },
+  { id: 'runtime', visible: true, window: 'user' as const, order: 11 },
+  { id: 'mcp', visible: true, window: 'user' as const, order: 12 },
 
   // User Window Tabs (In dropdown, initially hidden)
 ];

@@ -17,6 +17,7 @@ export type TabType =
   | 'vercel'
   | 'supabase'
   | 'event-logs'
+  | 'runtime'
   | 'mcp';
 
 export type WindowType = 'user' | 'developer';
@@ -80,6 +81,7 @@ export const TAB_LABELS: Record<TabType, string> = {
   vercel: 'Vercel',
   supabase: 'Supabase',
   'event-logs': 'Event Logs',
+  runtime: 'Runtime Mode',
   mcp: 'MCP Servers',
 };
 

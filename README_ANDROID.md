@@ -113,14 +113,51 @@ npm run android:open   # open in Android Studio to run
 ✅ Chat history and persistence
 ✅ Theme switching (dark/light)
 
-## What Doesn't Work on Android (Yet)
+## What Doesn't Work on Android (Without Remote Runtime)
 
 ❌ WebContainer (in-browser Node.js runtime)
 ❌ Terminal / shell commands
 ❌ Live preview of generated apps
 ❌ `npm install` / `npm run dev` inside the app
 
-These features require SharedArrayBuffer and cross-origin isolation, which Android WebView does not support. See `PORTING_REPORT.md` for the full analysis and `TODO_NEXT.md` for the roadmap to address these.
+These features require SharedArrayBuffer and cross-origin isolation, which Android WebView does not support.
+
+### Runtime Fallback Mode
+
+When bolt.diy detects that it's running in an Android WebView (or a browser without SharedArrayBuffer), it automatically enters **Android Fallback Mode**. A yellow banner appears at the top of the chat explaining the situation.
+
+In fallback mode:
+- **File editing** works in the UI (CodeMirror editor is fully functional)
+- **AI chat and code generation** work normally
+- **File tree** navigation works (files are kept in memory)
+- **Terminal, dev server, preview, and package install** are disabled
+
+### Runtime Mode Settings
+
+Open Settings → **Runtime Mode** to see the current runtime status and configure alternatives:
+
+| Mode | Description |
+|------|-------------|
+| **WebContainer Browser Mode** | Full in-browser runtime. Only available on desktop browsers with SharedArrayBuffer + cross-origin isolation. Greyed out on Android. |
+| **Android Fallback Mode** | In-memory file system. Code editing and AI chat work. No terminal, dev server, or preview. This is the default on Android. |
+| **Remote Runtime** | Connect to a remote sandbox server for command execution, package install, and dev server. File editing stays local. Enter the remote runtime URL in the settings. |
+
+The **Remote Runtime URL** field lets you save the URL of a future remote runtime server. The backend for this is not yet implemented — the URL is saved locally for when the remote runtime backend becomes available.
+
+### Capability Matrix
+
+| Feature | WebContainer | Android Fallback | Remote (future) |
+|---------|:---:|:---:|:---:|
+| File editing | ✅ real | ✅ in-memory | ✅ local |
+| Terminal | ✅ | ❌ stub | ✅ remote |
+| Command execution | ✅ | ❌ | ✅ remote |
+| Package install | ✅ | ❌ | ✅ remote |
+| Dev server | ✅ | ❌ | ✅ remote |
+| Live preview | ✅ | ❌ | ✅ remote |
+| AI chat | ✅ | ✅ | ✅ |
+| Code generation | ✅ | ✅ | ✅ |
+
+See `PORTING_REPORT.md` for the full technical analysis and `src/mobile/adapters/runtime/` for the adapter abstraction layer.
 
 ## Configuration
 
@@ -164,22 +201,54 @@ This is expected on Android. The app falls back to a chat-only mode. See above.
 ## Architecture
 
 ```
-┌─────────────────────────────────┐
-│  Android WebView (Capacitor)    │
-│                                 │
-│  ┌───────────────────────────┐  │
-│  │   bolt.diy Web App        │  │
-│  │   (Remix + Vite build)    │  │
-│  │                           │  │
-│  │  ✅ Chat / AI / Editor   │  │
-│  │  ❌ WebContainer (stub)  │  │
-│  └───────────────────────────┘  │
-│                                 │
-│  Capacitor Bridge (native APIs) │
-└─────────────────────────────────┘
+┌─────────────────────────────────────┐
+│  Android WebView (Capacitor)        │
+│                                     │
+│  ┌───────────────────────────────┐  │
+│  │  bolt.diy Web App             │  │
+│  │  (Remix + Vite build)         │  │
+│  │                               │  │
+│  │  ✅ Chat / AI / Editor       │  │
+│  │  ✅ File editing (in-memory) │  │
+│  │                               │  │
+│  │  Runtime Adapter Layer        │  │
+│  │  ┌─────────────────────────┐ │  │
+│  │  │ AndroidFallbackRuntime  │ │  │
+│  │  │ Adapter                 │ │  │
+│  │  │ (in-memory FS, stub     │ │  │
+│  │  │  terminal, no preview)  │ │  │
+│  │  └─────────────────────────┘ │  │
+│  └───────────────────────────────┘  │
+│                                     │
+│  Capacitor Bridge (native APIs)     │
+└─────────────────────────────────────┘
+
+  Future: Remote Runtime
+  ┌─────────────────────────────┐
+  │  RemoteRuntimeAdapter       │
+  │  (WebSocket → server-side   │
+  │   sandbox for commands,     │
+  │   dev server, preview)      │
+  └─────────────────────────────┘
 ```
 
-The web app detects Android via `app/lib/adapters/platform.ts` and routes WebContainer-dependent code through fallback adapters in `app/lib/adapters/`.
+### Runtime Adapter Layer
+
+The app detects Android via `app/lib/adapters/platform.ts` and selects the
+appropriate runtime adapter:
+
+- `src/mobile/adapters/runtime/RuntimeAdapter.ts` — interface
+- `src/mobile/adapters/runtime/WebContainerRuntimeAdapter.ts` — desktop
+- `src/mobile/adapters/runtime/AndroidFallbackRuntimeAdapter.ts` — Android
+- `src/mobile/adapters/runtime/index.ts` — factory + platform detection
+
+The runtime mode is tracked in `app/lib/stores/runtime-mode.ts` and
+displayed in Settings → Runtime Mode. A banner component
+(`app/components/mobile/RuntimeModeBanner.tsx`) shows the current mode
+at the top of the chat area.
+
+The existing lower-level adapter layer in `app/lib/adapters/` continues
+to work alongside the new runtime adapter abstraction.
 
 ## License
 

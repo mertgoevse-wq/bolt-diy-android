@@ -29,6 +29,7 @@ import NetlifyTab from '~/components/@settings/tabs/netlify/NetlifyTab';
 import CloudProvidersTab from '~/components/@settings/tabs/providers/cloud/CloudProvidersTab';
 import LocalProvidersTab from '~/components/@settings/tabs/providers/local/LocalProvidersTab';
 import McpTab from '~/components/@settings/tabs/mcp/McpTab';
+import RuntimeModeTab from '~/components/@settings/tabs/runtime/RuntimeModeTab';
 
 interface ControlPanelProps {
   open: boolean;
@@ -151,6 +152,8 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
         return <EventLogsTab />;
       case 'mcp':
         return <McpTab />;
+      case 'runtime':
+        return <RuntimeModeTab />;
 
       default:
         return null;
@@ -235,7 +238,7 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
           >
             <div
               className={classNames(
-                'w-[1200px] h-[90vh]',
+                'w-full max-w-[1200px] h-full md:h-[90vh] md:w-[1200px]',
                 'bg-bolt-elements-background-depth-1',
                 'rounded-2xl shadow-2xl',
                 'border border-bolt-elements-borderColor',
