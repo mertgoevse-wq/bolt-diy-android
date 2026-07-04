@@ -1,4 +1,5 @@
 import type { PathWatcherEvent, WebContainer } from '@webcontainer/api';
+import { isWebContainerSupported, isCapacitor } from '~/lib/adapters/platform';
 import { getEncoding } from 'istextorbinary';
 import { map, type MapStore } from 'nanostores';
 import { Buffer } from 'node:buffer';
@@ -46,6 +47,7 @@ export type FileMap = Record<string, Dirent | undefined>;
 
 export class FilesStore {
   #webcontainer: Promise<WebContainer>;
+  #isFallbackMode = false;
 
   /**
    * Tracks the number of files without folders.
@@ -76,6 +78,10 @@ export class FilesStore {
   constructor(webcontainerPromise: Promise<WebContainer>) {
     this.#webcontainer = webcontainerPromise;
 
+    // Check if we're in fallback mode (Android/no WebContainer)
+    if (!import.meta.env.SSR) {
+      this.#isFallbackMode = !isWebContainerSupported() || isCapacitor();
+    }
     // Load deleted paths from localStorage if available
     try {
       if (typeof localStorage !== 'undefined') {
@@ -590,7 +596,41 @@ export class FilesStore {
   }
 
   async #init() {
-    const webcontainer = await this.#webcontainer;
+    // In fallback mode (Android/no WebContainer), skip WebContainer initialization
+    // but still handle locked files and cleanup
+    if (this.#isFallbackMode) {
+      console.log('[FilesStore] Running in fallback mode — no WebContainer file watching');
+
+      // Clean up any files that were previously deleted
+      this.#cleanupDeletedFiles();
+
+      // Load locked files for the current chat
+      const currentChatId = getCurrentChatId();
+      migrateLegacyLocks(currentChatId);
+      this.#loadLockedFiles(currentChatId);
+
+      // Set up periodic lock refresh
+      setInterval(() => {
+        clearCache();
+        const latestChatId = getCurrentChatId();
+        this.#loadLockedFiles(latestChatId);
+      }, 30000);
+
+      return;
+    }
+
+    let webcontainer: WebContainer;
+    try {
+      webcontainer = await this.#webcontainer;
+    } catch (error) {
+      console.warn('[FilesStore] WebContainer unavailable, entering fallback mode:', error);
+      this.#isFallbackMode = true;
+      this.#cleanupDeletedFiles();
+      const currentChatId = getCurrentChatId();
+      migrateLegacyLocks(currentChatId);
+      this.#loadLockedFiles(currentChatId);
+      return;
+    }
 
     // Clean up any files that were previously deleted
     this.#cleanupDeletedFiles();

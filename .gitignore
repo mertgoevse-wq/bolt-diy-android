@@ -46,3 +46,17 @@ docs/instructions/Roadmap.md
 .cursorrules
 *.md
 .qodo
+
+# Android / Capacitor
+# Keep the android project in git (it's a native project, not just build output)
+# but ignore Gradle build artifacts
+android/app/build/
+android/.gradle/
+android/captures/
+android/local.properties
+android/app/src/main/assets/public/
+
+# Allow our documentation files through the *.md ignore
+!README_ANDROID.md
+!PORTING_REPORT.md
+!TODO_NEXT.md

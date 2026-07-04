@@ -1,0 +1,192 @@
+/**
+ * WebContainer Platform Adapter
+ *
+ * Wraps the existing @webcontainer/api in the PlatformAdapter interface
+ * for desktop browser environments where WebContainer is supported.
+ */
+
+import { WebContainer } from '@webcontainer/api';
+import type {
+  PlatformAdapter,
+  PlatformInfo,
+  IFileSystem,
+  ITerminalProcess,
+  IPreview,
+} from './types';
+import type { ITerminal } from '~/types/terminal';
+import { WORK_DIR_NAME } from '~/utils/constants';
+import { newShellProcess } from '~/utils/shell';
+
+export class WebContainerAdapter implements PlatformAdapter {
+  private instance: WebContainer | null = null;
+  private ready = false;
+  private serverReadyCallbacks: ((port: number, url: string) => void)[] = [];
+  private portCallbacks: ((port: number, type: 'open' | 'close', url: string) => void)[] = [];
+  private previewCallbacks: ((message: any) => void)[] = [];
+  private previews: IPreview[] = [];
+
+  getPlatformInfo(): PlatformInfo {
+    return {
+      type: 'webcontainer',
+      isMobile: false,
+      isAndroid: false,
+      isWebContainerSupported: true,
+      isElectron: false,
+    };
+  }
+
+  async boot(): Promise<void> {
+    if (this.instance) return;
+
+    this.instance = await WebContainer.boot({
+      coep: 'credentialless',
+      workdirName: WORK_DIR_NAME,
+      forwardPreviewErrors: true,
+    });
+
+    this.ready = true;
+
+    this.instance.on('server-ready', (port, url) => {
+      this.serverReadyCallbacks.forEach((cb) => cb(port, url));
+    });
+
+    this.instance.on('port', (port, type, url) => {
+      this.portCallbacks.forEach((cb) => cb(port, type, url));
+    });
+
+    this.instance.on('preview-message', (message) => {
+      this.previewCallbacks.forEach((cb) => cb(message));
+    });
+  }
+
+  isReady(): boolean {
+    return this.ready;
+  }
+
+  getFileSystem(): IFileSystem {
+    if (!this.instance) {
+      throw new Error('WebContainer not booted');
+    }
+
+    const wc = this.instance;
+
+    return {
+      async readFile(path: string) {
+        const data = await wc.fs.readFile(path);
+        const buffer = new Uint8Array(data.byteLength);
+        buffer.set(new Uint8Array(data));
+        const isBinary = buffer.some((byte) => byte === 0);
+        const content = isBinary ? '' : new TextDecoder().decode(buffer);
+        return { content, isBinary };
+      },
+
+      async writeFile(path: string, content: string | Uint8Array) {
+        if (typeof content === 'string') {
+          await wc.fs.writeFile(path, content);
+        } else {
+          await wc.fs.writeFile(path, content);
+        }
+      },
+
+      async mkdir(path: string, recursive?: boolean) {
+        await wc.fs.mkdir(path, { recursive });
+      },
+
+      async readdir(path: string) {
+        const entries = await wc.fs.readdir(path, { withFileTypes: true });
+        return entries.map((entry) => ({
+          name: entry.name,
+          path: `${path}/${entry.name}`,
+          type: entry.isDirectory() ? 'folder' as const : 'file' as const,
+        }));
+      },
+
+      async rm(path: string, recursive?: boolean) {
+        await wc.fs.rm(path, { recursive });
+      },
+
+      async rename(oldPath: string, newPath: string) {
+        await wc.fs.rename(oldPath, newPath);
+      },
+
+      async watch(path: string, callback: (event: any) => void) {
+        const watcher = await wc.fs.watch(path, { recursive: true });
+        watcher.addEventListener('change', (event) => {
+          callback({ path: event.filename || path, type: 'change' });
+        });
+        return () => watcher.close();
+      },
+    };
+  }
+
+  async spawnShell(terminal: ITerminal): Promise<ITerminalProcess> {
+    if (!this.instance) {
+      throw new Error('WebContainer not booted');
+    }
+
+    const process = await newShellProcess(this.instance, terminal);
+
+    return {
+      get input() {
+        return process.input.getWriter();
+      },
+      get output() {
+        return process.output;
+      },
+      resize(cols: number, rows: number) {
+        process.resize({ cols, rows });
+      },
+      kill() {
+        process.kill();
+      },
+    };
+  }
+
+  async executeCommand(command: string): Promise<{ output: string; exitCode: number }> {
+    if (!this.instance) {
+      throw new Error('WebContainer not booted');
+    }
+
+    const process = await this.instance.spawn('jsh', ['-c', command]);
+    const output = await process.output;
+    const reader = output.getReader();
+    let result = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      result += value;
+    }
+
+    const exitCode = (await process.exit) as number;
+    return { output: result, exitCode };
+  }
+
+  onServerReady(callback: (port: number, url: string) => void): void {
+    this.serverReadyCallbacks.push(callback);
+  }
+
+  onPortEvent(callback: (port: number, type: 'open' | 'close', url: string) => void): void {
+    this.portCallbacks.push(callback);
+  }
+
+  onPreviewMessage(callback: (message: any) => void): void {
+    this.previewCallbacks.push(callback);
+  }
+
+  async setPreviewScript(script: string): Promise<void> {
+    if (this.instance) {
+      await this.instance.setPreviewScript(script);
+    }
+  }
+
+  getPreviews(): IPreview[] {
+    return this.previews;
+  }
+
+  async shutdown(): Promise<void> {
+    // WebContainer doesn't have a public shutdown method
+    this.ready = false;
+    this.instance = null;
+  }
+}
