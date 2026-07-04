@@ -35,6 +35,12 @@ export interface RuntimeModeState {
   /** Remote runtime URL (saved by user, used when mode = 'remote') */
   remoteRuntimeUrl: string;
 
+  /** Remote runtime authorization token */
+  remoteAuthToken: string;
+
+  /** Remote runtime workspace ID */
+  remoteWorkspaceId: string;
+
   /** Capabilities of the active mode */
   capabilities: {
     fileSystem: boolean;
@@ -129,11 +135,29 @@ function getCapabilitiesForMode(mode: RuntimeMode, webContainerAvailable: boolea
  */
 
 const STORAGE_KEY_REMOTE_URL = 'bolt_remote_runtime_url';
+const STORAGE_KEY_REMOTE_TOKEN = 'bolt_remote_runtime_auth_token';
+const STORAGE_KEY_REMOTE_WORKSPACE = 'bolt_remote_runtime_workspace_id';
 const STORAGE_KEY_MODE_OVERRIDE = 'bolt_runtime_mode_override';
 
 function loadSavedRemoteUrl(): string {
   try {
     return localStorage.getItem(STORAGE_KEY_REMOTE_URL) || '';
+  } catch {
+    return '';
+  }
+}
+
+function loadSavedRemoteToken(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY_REMOTE_TOKEN) || '';
+  } catch {
+    return '';
+  }
+}
+
+function loadSavedRemoteWorkspace(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY_REMOTE_WORKSPACE) || '';
   } catch {
     return '';
   }
@@ -183,6 +207,8 @@ function createInitialState(): RuntimeModeState {
     webContainerAvailable: detected.webContainerAvailable,
     isAndroid: detected.isAndroid,
     remoteRuntimeUrl: loadSavedRemoteUrl(),
+    remoteAuthToken: loadSavedRemoteToken(),
+    remoteWorkspaceId: loadSavedRemoteWorkspace(),
     capabilities: getCapabilitiesForMode(mode, detected.webContainerAvailable),
     autoDetected: override === null,
   };
@@ -239,6 +265,42 @@ export function setRemoteRuntimeUrl(url: string): void {
   runtimeModeStore.set({
     ...current,
     remoteRuntimeUrl: url,
+  });
+}
+
+/**
+ * Set the remote runtime authentication token. Persisted to localStorage.
+ */
+export function setRemoteAuthToken(token: string): void {
+  const current = runtimeModeStore.get();
+
+  try {
+    localStorage.setItem(STORAGE_KEY_REMOTE_TOKEN, token);
+  } catch {
+    // ignore
+  }
+
+  runtimeModeStore.set({
+    ...current,
+    remoteAuthToken: token,
+  });
+}
+
+/**
+ * Set the remote runtime workspace ID. Persisted to localStorage.
+ */
+export function setRemoteWorkspaceId(workspaceId: string): void {
+  const current = runtimeModeStore.get();
+
+  try {
+    localStorage.setItem(STORAGE_KEY_REMOTE_WORKSPACE, workspaceId);
+  } catch {
+    // ignore
+  }
+
+  runtimeModeStore.set({
+    ...current,
+    remoteWorkspaceId: workspaceId,
   });
 }
 

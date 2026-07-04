@@ -15,10 +15,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useStore } from '@nanostores/react';
 import { toast } from 'react-toastify';
-import { runtimeModeStore, resetRuntimeMode, setRuntimeMode, setRemoteRuntimeUrl, type RuntimeMode } from '~/lib/stores/runtime-mode';
+import {
+  runtimeModeStore,
+  resetRuntimeMode,
+  setRuntimeMode,
+  setRemoteRuntimeUrl,
+  setRemoteAuthToken,
+  setRemoteWorkspaceId,
+  type RuntimeMode,
+} from '~/lib/stores/runtime-mode';
 import { getAndroidFallbackPersistenceStatus } from '~/lib/persistence/androidFallbackStorage';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
+import { RemoteRuntimeClient } from '~/lib/remote-runtime/RemoteRuntimeClient';
 
 interface PersistenceStatus {
   available: boolean;
@@ -34,10 +43,21 @@ export default function AndroidSettingsPanel() {
   });
   const [resetting, setResetting] = useState(false);
   const [urlInput, setUrlInput] = useState(runtime.remoteRuntimeUrl);
+  const [tokenInput, setTokenInput] = useState(runtime.remoteAuthToken);
+  const [workspaceInput, setWorkspaceInput] = useState(runtime.remoteWorkspaceId);
+  const [testingConnection, setTestingConnection] = useState(false);
 
   useEffect(() => {
     setUrlInput(runtime.remoteRuntimeUrl);
   }, [runtime.remoteRuntimeUrl]);
+
+  useEffect(() => {
+    setTokenInput(runtime.remoteAuthToken);
+  }, [runtime.remoteAuthToken]);
+
+  useEffect(() => {
+    setWorkspaceInput(runtime.remoteWorkspaceId);
+  }, [runtime.remoteWorkspaceId]);
 
   const handleUrlSave = useCallback(() => {
     const trimmed = urlInput.trim();
@@ -56,6 +76,36 @@ export default function AndroidSettingsPanel() {
     setRemoteRuntimeUrl(trimmed);
     toast.success(trimmed ? 'Remote runtime URL saved' : 'Remote runtime URL cleared');
   }, [urlInput]);
+
+  const handleTokenSave = useCallback(() => {
+    setRemoteAuthToken(tokenInput.trim());
+    toast.success('Auth token saved');
+  }, [tokenInput]);
+
+  const handleWorkspaceSave = useCallback(() => {
+    setRemoteWorkspaceId(workspaceInput.trim());
+    toast.success('Workspace ID saved');
+  }, [workspaceInput]);
+
+  const handleTestConnection = useCallback(async () => {
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl) {
+      toast.error('Remote Runtime URL is required to test connection');
+      return;
+    }
+
+    setTestingConnection(true);
+    try {
+      const client = new RemoteRuntimeClient(trimmedUrl, tokenInput.trim(), workspaceInput.trim());
+      const health = await client.checkHealth();
+      toast.success(`Connected successfully! Server version: ${health.version}, Status: ${health.status}`);
+    } catch (err: any) {
+      console.error('[RemoteRuntime] Test connection failed', err);
+      toast.error(`Connection failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setTestingConnection(false);
+    }
+  }, [urlInput, tokenInput, workspaceInput]);
 
   const handleModeChange = useCallback(
     (mode: RuntimeMode) => {
@@ -177,41 +227,114 @@ export default function AndroidSettingsPanel() {
         <section className={classNames('android-card', { 'opacity-60': runtime.mode !== 'remote' })}>
           <h2 className="android-card-title">
             <div className="i-ph:link-fill" />
-            Remote Runtime URL
+            Remote Runtime Settings
           </h2>
-          <div className="android-card-content gap-3">
+          <div className="android-card-content gap-3.5">
             <p className="text-xs text-bolt-elements-textSecondary leading-relaxed">
               Connect to a remote sandbox server for terminal command execution and app previews.
             </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://runtime.example.com"
-                disabled={runtime.mode !== 'remote'}
-                className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[#0A0A0A] border border-bolt-elements-borderColor text-bolt-elements-textPrimary focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-bolt-elements-textTertiary disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <button
-                onClick={handleUrlSave}
-                disabled={runtime.mode !== 'remote'}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Save
-              </button>
-            </div>
-            {runtime.remoteRuntimeUrl && (
-              <div className="text-xs text-green-500 flex items-center gap-1">
-                <div className="i-ph:check-circle-fill w-3.5 h-3.5" />
-                <span>Saved: {runtime.remoteRuntimeUrl}</span>
+
+            {/* URL Input */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-bolt-elements-textTertiary font-semibold uppercase tracking-wider">Server URL</span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://runtime.example.com"
+                  disabled={runtime.mode !== 'remote'}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[#0A0A0A] border border-bolt-elements-borderColor text-bolt-elements-textPrimary focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-bolt-elements-textTertiary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  onClick={handleUrlSave}
+                  disabled={runtime.mode !== 'remote'}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Save
+                </button>
               </div>
-            )}
+              {runtime.remoteRuntimeUrl && (
+                <div className="text-[10px] text-green-500 flex items-center gap-0.5 mt-0.5">
+                  <div className="i-ph:check-circle-fill w-3 h-3" />
+                  <span>Saved: {runtime.remoteRuntimeUrl}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Auth Token Input */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-bolt-elements-textTertiary font-semibold uppercase tracking-wider">Auth Token</span>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  placeholder="Bearer Auth Token"
+                  disabled={runtime.mode !== 'remote'}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[#0A0A0A] border border-bolt-elements-borderColor text-bolt-elements-textPrimary focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-bolt-elements-textTertiary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  onClick={handleTokenSave}
+                  disabled={runtime.mode !== 'remote'}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+              {runtime.remoteAuthToken && (
+                <div className="text-[10px] text-green-500 flex items-center gap-0.5 mt-0.5">
+                  <div className="i-ph:check-circle-fill w-3 h-3" />
+                  <span>Token saved (length: {runtime.remoteAuthToken.length})</span>
+                </div>
+              )}
+            </div>
+
+            {/* Workspace ID Input */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-bolt-elements-textTertiary font-semibold uppercase tracking-wider">Workspace ID</span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={workspaceInput}
+                  onChange={(e) => setWorkspaceInput(e.target.value)}
+                  placeholder="ws_xyz123"
+                  disabled={runtime.mode !== 'remote'}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[#0A0A0A] border border-bolt-elements-borderColor text-bolt-elements-textPrimary focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-bolt-elements-textTertiary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  onClick={handleWorkspaceSave}
+                  disabled={runtime.mode !== 'remote'}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+              {runtime.remoteWorkspaceId && (
+                <div className="text-[10px] text-green-500 flex items-center gap-0.5 mt-0.5">
+                  <div className="i-ph:check-circle-fill w-3 h-3" />
+                  <span>Saved ID: {runtime.remoteWorkspaceId}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Test Connection Button */}
             <button
-              disabled
-              className="android-secondary-btn opacity-60 text-xs font-semibold py-2 mt-1 cursor-not-allowed"
+              onClick={handleTestConnection}
+              disabled={runtime.mode !== 'remote' || testingConnection || !urlInput.trim()}
+              className="android-secondary-btn text-xs font-semibold py-2 mt-2 w-full flex items-center justify-center gap-2 hover:bg-bolt-elements-background-depth-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <div className="i-ph:plugs-fill" />
-              Test Connection (Backend TODO)
+              {testingConnection ? (
+                <>
+                  <div className="i-ph:spinner-gap animate-spin w-4 h-4" />
+                  <span>Testing Connection...</span>
+                </>
+              ) : (
+                <>
+                  <div className="i-ph:plugs-fill w-4 h-4" />
+                  <span>Test Connection</span>
+                </>
+              )}
             </button>
           </div>
         </section>

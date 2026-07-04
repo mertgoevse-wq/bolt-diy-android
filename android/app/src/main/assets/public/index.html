@@ -1,19 +1,32 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>bolt.diy Android</title>
-  <style>
-    body { background: #0c0c0c; color: #fff; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-    h1 { font-size: 1.5rem; }
-    p { color: #888; }
-  </style>
-</head>
-<body>
-  <div>
-    <h1>⚡ bolt.diy Android</h1>
-    <p>Run <code>npm run android:sync</code> to build the web app.</p>
-  </div>
-</body>
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>bolt.diy Android</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply theme before React mounts to avoid FOUC
+      (function () {
+        try {
+          var theme = localStorage.getItem('bolt_theme');
+          if (!theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/android-index-CbCrzyK4.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/android-index-BVWe7SbY.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

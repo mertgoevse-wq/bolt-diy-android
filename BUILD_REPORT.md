@@ -170,6 +170,24 @@ To provide a seamless experience on mobile where WebContainer features (like she
 
 ---
 
+## APK Compilation & Web Preview
+
+- **Debug APK Location**: `android/app/build/outputs/apk/debug/app-debug.apk`
+- **Gradle Compilation**: Succeeded in 2m 1s via automated Gradle wrapper with JVM 21 auto-detection.
+- **Local Web Preview**:
+  - Dev server: `npm run android:dev` (exposed on Wi-Fi: `npm run android:dev:host`)
+  - Production build preview: `npm run android:webpreview` (exposed on Wi-Fi: `npm run android:webpreview:host`)
+
+---
+
+## Phase 5: Remote Runtime Design & Scaffold
+
+- **Specification**: Created `docs/REMOTE_RUNTIME.md` detailing the secure API contract and WS streams protocol.
+- **Client SDK**: Implemented `app/lib/remote-runtime/RemoteRuntimeClient.ts` to manage workspace sync and health status tests.
+- **Settings UI**: Added token/workspace fields and an interactive **"Test Connection"** trigger invoking the health check.
+
+---
+
 ## Remaining Limitations
 
 | Area | Status | Notes |
@@ -179,6 +197,7 @@ To provide a seamless experience on mobile where WebContainer features (like she
 | Terminal | ⚠️ | Polished fallback UI with remote runtime setup redirection |
 | File persistence | ✅ | IndexedDB working |
 | UI layout (mobile) | ⚠️ | Basic tab nav works; full Phase 2 responsive pass pending |
+| APK compilation | ✅ | Fully automated debug build command |
 | APK release signing | ❌ | Phase 6 |
 
 ---
@@ -186,7 +205,10 @@ To provide a seamless experience on mobile where WebContainer features (like she
 ## Commit History
 
 ```
-feat: polish android terminal and preview fallback   ← this commit
+feat: scaffold remote runtime client   ← this commit
+docs: add github repository metadata guide
+feat: add branding preview and apk build workflow
+feat: polish android terminal and preview fallback
 feat: add reliable android webview shell
 feat: add android-specific entry point and build validation
 chore: verify android persistence integration
@@ -201,4 +223,4 @@ feat: add runtime adapter layer
 ---
 
 **Verification completed**: 2026-07-04  
-**Status**: ✅ PASS — real UI renders in Capacitor WebView
+**Status**: ✅ PASS — debug APK built & remote client scaffolded

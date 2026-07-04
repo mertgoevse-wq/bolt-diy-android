@@ -64,6 +64,8 @@ android/app/src/main/assets/public/
 !CURRENT_STATUS.md
 !BRANDING.md
 !BUILD_REPORT.md
+!docs/github-repo-settings.md
+!docs/REMOTE_RUNTIME.md
 
 # Package lock & generated gradle configs
 package-lock.json
