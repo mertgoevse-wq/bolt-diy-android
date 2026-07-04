@@ -8,7 +8,7 @@
 ## Phase 1: WebView Wrapper ✅ DONE
 
 - [x] Install Capacitor (core, cli, android — v7 for Node 20 compat)
-- [x] Create `capacitor.config.ts` (appId: `com.boltdiy.app`, webDir: `build/client`)
+- [x] Create `capacitor.config.ts` (appId: `com.mertgoevse.boltdiyandroid`, webDir: `build/client`)
 - [x] Run `cap add android` — native project scaffolded
 - [x] Add npm scripts: `android:sync`, `android:open`, `android:build`, `android:run`, `android:copy`, `android:clean`, `android:init`
 - [x] Create platform adapter layer (`app/lib/adapters/`)

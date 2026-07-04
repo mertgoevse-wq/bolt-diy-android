@@ -1,8 +1,8 @@
-# Current Android Port Status
+# bolt.diy Android — Current Status
 
 **Last updated:** 2026-07-05
 **Branch:** `main`
-**Commits ahead of upstream:** 5
+**Commits ahead of upstream:** 7
 **Target device:** Samsung Galaxy A56 (Android 15, 1080×2340)
 
 ---
@@ -16,7 +16,7 @@
 | Item | Status | Details |
 |------|--------|---------|
 | Capacitor installed | ✅ | v7.6.7 (core, cli, android) — chosen for Node 20 compat |
-| `capacitor.config.ts` | ✅ | appId `com.boltdiy.app`, webDir `build/client`, debug flags, splash screen |
+| `capacitor.config.ts` | ✅ | appId `com.mertgoevse.boltdiyandroid`, webDir `build/client`, debug flags, splash screen |
 | Android project scaffolded | ✅ | `cap add android` — Gradle, MainActivity, manifests, resources, splash icons |
 | npm scripts | ✅ | 7 scripts: `android:init`, `android:sync`, `android:copy`, `android:open`, `android:build`, `android:run`, `android:clean` |
 | `cap copy android` tested | ✅ | Web assets copy to `android/app/src/main/assets/public/` successfully |
@@ -93,7 +93,7 @@
 ## Current Architecture
 
 ```
-bolt.diy/
+bolt-diy-android/
 ├── app/                         # Remix/Vite web app (unchanged from upstream)
 │   ├── lib/
 │   │   ├── adapters/            # NEW — platform abstraction layer
@@ -116,7 +116,7 @@ bolt.diy/
 │   │   ├── build.gradle         #   compileSdk 35, minSdk 23, targetSdk 35
 │   │   ├── src/main/
 │   │   │   ├── AndroidManifest.xml
-│   │   │   ├── java/com/boltdiy/app/MainActivity.java
+│   │   │   ├── java/com/mertgoevse/boltdiyandroid/MainActivity.java
 │   │   │   └── res/             #   icons, splash, strings, styles
 │   │   └── ...
 │   ├── build.gradle
@@ -140,7 +140,7 @@ bolt.diy/
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | Capacitor installed | ✅ Working | v7.6.7, `cap copy` succeeds |
-| Android project | ✅ Scaffolded | `com.boltdiy.app`, minSdk 23, targetSdk 35 |
+| Android project | ✅ Scaffolded | `com.mertgoevse.boltdiyandroid`, minSdk 23, targetSdk 35 |
 | Web build → Android | ✅ Pipeline exists | `npm run android:sync` → `remix vite:build` → `cap sync android` |
 | WebContainer on Android | ❌ Not available | SharedArrayBuffer unsupported in WebView — guarded, app doesn't crash |
 | Terminal on Android | ⚠️ Fallback only | xterm renders but no shell process; shows empty terminal |
@@ -274,3 +274,27 @@ de15701 feat: add android capacitor shell
 - This is the **upstream repository**, not a fork.
 - Push requires: (1) a fork or new repo, (2) GitHub authentication.
 - See "Push Status" section below.
+
+---
+
+## Branding Pass ✅ COMPLETE
+
+**Commit: `chore: rebrand as bolt-diy-android`**
+
+| Item | Status | Details |
+|------|--------|---------|
+| Project name | ✅ | `bolt-diy-android` |
+| Display name | ✅ | `bolt.diy Android` |
+| Android package | ✅ | `com.mertgoevse.boltdiyandroid` |
+| README.md | ✅ | Replaced with Android-port README |
+| NOTICE.md | ✅ | Attribution and copyright |
+| BRANDING.md | ✅ | `docs/branding/BRANDING.md` |
+| New logo SVG | ✅ | `public/bolt-diy-android-logo.svg` |
+| New app icon SVG | ✅ | `public/bolt-diy-android-icon.svg` |
+| Android strings.xml | ✅ | App name → `bolt.diy Android` |
+| Android build.gradle | ✅ | namespace + applicationId updated |
+| MainActivity.java | ✅ | Moved to `com/mertgoevse/boltdiyandroid/` |
+| capacitor.config.ts | ✅ | appId + appName updated |
+| package.json | ✅ | name, description, author, contributors |
+| Original LICENSE | ✅ | Retained unchanged |
+| Original logos | ✅ | Not deleted, not claimed as owned |

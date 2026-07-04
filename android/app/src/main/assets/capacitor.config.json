@@ -1,6 +1,6 @@
 {
-	"appId": "com.boltdiy.app",
-	"appName": "Bolt DIY",
+	"appId": "com.mertgoevse.boltdiyandroid",
+	"appName": "bolt.diy Android",
 	"webDir": "build/client",
 	"server": {
 		"androidScheme": "https",

@@ -1,10 +1,10 @@
-# Bolt.diy for Android
+# bolt.diy Android — Android Build Guide
 
 This guide walks you through building and running bolt.diy as a native Android app using [Capacitor](https://capacitorjs.com/).
 
 ## What This Is
 
-Bolt.diy is a browser-based AI coding assistant. The Android version wraps the web app in a native Android WebView shell. The chat interface, AI provider selection, code generation, and file editing all work on Android. Features that depend on [WebContainer](https://webcontainer.io/) — in-browser terminal, live preview, and shell commands — are not available in the Android WebView and will show a fallback message.
+bolt.diy Android is an Android port/adaptation of bolt.diy, the browser-based AI coding assistant. The Android version wraps the web app in a native Android WebView shell. The chat interface, AI provider selection, code generation, and file editing all work on Android. Features that depend on [WebContainer](https://webcontainer.io/) — in-browser terminal, live preview, and shell commands — are not available in the Android WebView and will show a fallback message.
 
 ## Prerequisites
 
@@ -275,8 +275,8 @@ At minimum, you need at least one LLM provider key (e.g., `OPENAI_API_KEY`).
 
 Edit `capacitor.config.ts`:
 ```ts
-appId: 'com.boltdiy.app',  // your package name
-appName: 'Bolt DIY',        // display name
+appId: 'com.mertgoevse.boltdiyandroid',  // your package name
+appName: 'bolt.diy Android',        // display name
 ```
 
 ## Troubleshooting

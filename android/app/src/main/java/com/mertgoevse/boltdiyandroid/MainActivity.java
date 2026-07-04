@@ -1,4 +1,4 @@
-package com.boltdiy.app;
+package com.mertgoevse.boltdiyandroid;
 
 import com.getcapacitor.BridgeActivity;
 

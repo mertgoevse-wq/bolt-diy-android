@@ -1,14 +1,14 @@
 {
-  "name": "bolt",
-  "description": "An AI Agent",
+  "name": "bolt-diy-android",
+  "description": "Android-first mobile port/adaptation of bolt.diy",
   "private": true,
   "license": "MIT",
   "sideEffects": false,
   "type": "module",
   "version": "1.0.0",
   "author": {
-    "name": "bolt.diy team",
-    "email": "maintainers@bolt.diy"
+    "name": "Mert G\u00f6vse",
+    "email": "mertgoevse@gmail.com"
   },
   "scripts": {
     "deploy": "npm run build && wrangler pages deploy",
@@ -222,5 +222,11 @@
   "resolutions": {
     "@typescript-eslint/utils": "^8.0.0-alpha.30"
   },
-  "packageManager": "pnpm@9.14.4"
+  "packageManager": "pnpm@9.14.4",
+  "contributors": [
+    {
+      "name": "StackBlitz Labs and bolt.diy contributors",
+      "url": "https://github.com/stackblitz-labs/bolt.diy"
+    }
+  ]
 }

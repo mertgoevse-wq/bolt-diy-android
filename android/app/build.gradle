@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.boltdiy.app"
+    namespace "com.mertgoevse.boltdiyandroid"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.boltdiy.app"
+        applicationId "com.mertgoevse.boltdiyandroid"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
