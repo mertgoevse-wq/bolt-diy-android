@@ -1,8 +1,8 @@
 # bolt.diy Android — Current Status
 
-**Last updated:** 2026-07-05
-**Branch:** `main`
-**Commits ahead of upstream:** 7
+**Last updated:** 2026-07-04  
+**Branch:** `main`  
+**Commits ahead of upstream:** 10  
 **Target device:** Samsung Galaxy A56 (Android 15, 1080×2340)
 
 ---
@@ -144,7 +144,8 @@ bolt-diy-android/
 | Web build → Android | ✅ Pipeline exists | `npm run android:sync` → `remix vite:build` → `cap sync android` |
 | WebContainer on Android | ❌ Not available | SharedArrayBuffer unsupported in WebView — guarded, app doesn't crash |
 | Terminal on Android | ⚠️ Fallback only | xterm renders but no shell process; shows empty terminal |
-| File system on Android | ⚠️ Fallback only | In-memory nanostores map updates; no persistence; no WebContainer FS |
+| File system on Android | ✅ IndexedDB persistence | In-memory store + IndexedDB auto-save/restore across restarts |
+| Android WebView shell | ✅ Real UI loads | `android:webbuild` → `build/client/index.html` → Capacitor |
 | Preview on Android | ❌ No preview | No WebContainer = no preview server; iframe has no URL |
 | LLM chat on Android | ❌ Not working | 33 server-side API routes have no server in WebView |
 | Mobile UI | ❌ Not started | Desktop layouts break at 360px (533px min-width, 1200px modal) |
@@ -161,7 +162,7 @@ bolt-diy-android/
 
 3. **No terminal** — The terminal tabs render but have no shell process. Users see an empty xterm instance.
 
-4. **No file persistence** — Files created by AI actions update the in-memory store but are lost on app restart. No real filesystem writes happen.
+4. **IndexedDB file persistence** — Files created by AI actions are saved to IndexedDB and restored on app restart. In-memory store is always in sync with IndexedDB.
 
 5. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
 

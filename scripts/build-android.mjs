@@ -21,16 +21,16 @@ const BUILD_CLIENT = path.join(ROOT, 'build', 'client');
 
 console.log('\n[Android Build] Starting...');
 
-// Step 1: Run the standard Remix Vite build
-console.log('\n[Build] Running Remix Vite build...');
-const buildResult = spawnSync('npm', ['run', 'build:remix'], {
+// Step 1: Run the Android-specific Vite build (no Remix server deps)
+console.log('\n[Build] Running Android Vite build...');
+const buildResult = spawnSync('npm', ['run', 'android:webbuild'], {
   cwd: ROOT,
   stdio: 'inherit',
   shell: true,
 });
 
 if (buildResult.status !== 0) {
-  console.error('\n[Error] Remix build failed');
+  console.error('\n[Error] Android web build failed');
   process.exit(1);
 }
 

@@ -11,7 +11,7 @@
 import { useEffect } from 'react';
 import { useStore } from '@nanostores/react';
 import { runtimeModeStore } from '~/lib/stores/runtime-mode';
-import App from './index';
+import App from './_index';
 
 export default function AndroidEntry() {
   const runtime = useStore(runtimeModeStore);

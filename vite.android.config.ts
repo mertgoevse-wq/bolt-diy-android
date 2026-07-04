@@ -1,0 +1,107 @@
+/**
+ * Vite config for Android shell build.
+ *
+ * Produces a pure SPA (no Remix server, no Cloudflare Worker) suitable
+ * for bundling inside the Capacitor WebView as build/client/index.html.
+ *
+ * Key differences from vite.config.ts:
+ *  - No remixVitePlugin (no SSR, no Cloudflare Dev Proxy)
+ *  - react() plugin instead → plain CSR React app
+ *  - rollupOptions.input = android-entry.html
+ *  - outDir = build/client  (same dir Capacitor reads from)
+ *  - VITE_ANDROID_BUILD = 'true' env flag for conditional imports
+ */
+
+import react from '@vitejs/plugin-react';
+import UnoCSS from 'unocss/vite';
+import { defineConfig, type Plugin } from 'vite';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import tsconfigPaths from 'vite-tsconfig-paths';
+import * as dotenv from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * After the Vite build, rename android-index.html → index.html
+ * in the output directory. Capacitor requires build/client/index.html
+ * as the entry point.
+ */
+function renameOutputHtml(outputHtmlName: string): Plugin {
+  return {
+    name: 'rename-output-html',
+    closeBundle() {
+      const outDir = resolve(__dirname, 'build/client');
+      const src = resolve(outDir, outputHtmlName);
+      const dst = resolve(outDir, 'index.html');
+
+      if (fs.existsSync(src)) {
+        fs.renameSync(src, dst);
+        console.log(`[rename-output-html] ${outputHtmlName} → index.html`);
+      }
+    },
+  };
+}
+
+// Load environment variables
+dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' });
+dotenv.config();
+
+export default defineConfig({
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    'import.meta.env.VITE_ANDROID_BUILD': JSON.stringify('true'),
+  },
+  build: {
+    target: 'esnext',
+    outDir: 'build/client',
+    emptyOutDir: true,
+    rollupOptions: {
+      input: resolve(__dirname, 'android-index.html'),
+    },
+  },
+  plugins: [
+    nodePolyfills({
+      include: ['buffer', 'process', 'util', 'stream'],
+      globals: {
+        Buffer: true,
+        process: true,
+        global: true,
+      },
+      protocolImports: true,
+      exclude: ['child_process', 'fs', 'path'],
+    }),
+    react(),
+    UnoCSS(),
+    tsconfigPaths(),
+    renameOutputHtml('android-index.html'),
+  ],
+  envPrefix: [
+    'VITE_',
+    'OPENAI_LIKE_API_BASE_URL',
+    'OPENAI_LIKE_API_MODELS',
+    'OLLAMA_API_BASE_URL',
+    'LMSTUDIO_API_BASE_URL',
+    'TOGETHER_API_BASE_URL',
+  ],
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: 'modern-compiler',
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      // Point ~ to app/ for tsconfigPaths compat
+      '~': resolve(__dirname, 'app'),
+      // Stub out Remix router hooks — Android SPA doesn't have a Remix server
+      '@remix-run/react': resolve(__dirname, 'src/shims/remix-react.tsx'),
+      // Stub out Cloudflare-specific imports not needed in SPA
+      '@remix-run/cloudflare': resolve(__dirname, 'src/shims/remix-cloudflare.ts'),
+    },
+  },
+});
