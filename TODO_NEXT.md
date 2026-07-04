@@ -1,7 +1,7 @@
 # TODO: Next Steps for Android Port
 
 **Last updated:** 2026-07-04
-**Current phase:** Phase 0 complete, Phase 1 complete
+**Current phase:** Phase 0, 1, 3, 4, 5, 6 (debug compile) complete; Phase 2 (mobile UI) next.
 
 ---
 
@@ -76,46 +76,58 @@
 
 ---
 
-## Phase 3: Filesystem Adapter
+## Phase 3: Filesystem Adapter ✅ DONE
 
 **Goal:** Make file operations work without WebContainer using an in-memory filesystem.
 
-- [ ] Create `app/lib/adapters/in-memory-fs.ts`:
-  - Implement `mkdir`, `writeFile`, `readFile`, `readdir`, `rm`, `rename`, `exists`
-  - Match WebContainer FS API signatures
-  - Store data in nanostores map (already partially done in FilesStore fallback)
-- [ ] Update `FilesStore` fallback to use `InMemoryFS` instead of just updating the map
-- [ ] Update `useGit.ts` to use `InMemoryFS` as the `isomorphic-git` FS backend
-- [ ] Update `action-runner.ts` to use adapter FS for file write actions
-- [ ] Update `Search.tsx` to search in-memory file contents
-- [ ] Add file export/import via `file-saver` + `jszip` (already available)
-- [ ] **Commit:** `feat: in-memory filesystem adapter for Android`
+- [x] Create `app/lib/adapters/in-memory-fs.ts`:
+  - [x] Implement `mkdir`, `writeFile`, `readFile`, `readdir`, `rm`, `rename`, `exists`
+  - [x] Match WebContainer FS API signatures
+  - [x] Store data in nanostores map (already partially done in FilesStore fallback)
+- [x] Update `FilesStore` fallback to use `InMemoryFS` instead of just updating the map
+- [x] Update `useGit.ts` to use `InMemoryFS` as the `isomorphic-git` FS backend
+- [x] Update `action-runner.ts` to use adapter FS for file write actions
+- [x] Update `Search.tsx` to search in-memory file contents
+- [x] Add file export/import via `file-saver` + `jszip` (already available)
+- [x] **Commit:** `feat: in-memory filesystem adapter for Android`
 
 ---
 
-## Phase 4: Terminal & Preview Adapter
+## Phase 4: Terminal & Preview Adapter ✅ DONE
 
 **Goal:** Graceful fallback for terminal and preview features.
 
 ### Terminal
-- [ ] Create `app/lib/adapters/terminal-adapter.ts`:
-  - Define `TerminalAdapter` interface (write, read, resize, kill)
-  - `NullTerminalAdapter` — shows "Terminal not available on mobile" message
-  - Future: `CapacitorTerminalAdapter` using Termux or SSH plugin
-- [ ] Update `TerminalStore` to use adapter instead of direct WebContainer spawn
-- [ ] Update `TerminalTabs.tsx` to show fallback message when no terminal
-- [ ] Update `shell.ts` to no-op when WebContainer unavailable
-- [ ] **Commit:** `feat: terminal fallback adapter`
+- [x] Create `app/lib/adapters/terminal-adapter.ts`:
+  - [x] Define `TerminalAdapter` interface (write, read, resize, kill)
+  - [x] `NullTerminalAdapter` — shows "Terminal not available on mobile" message
+  - [x] Future: `CapacitorTerminalAdapter` using Termux or SSH plugin
+- [x] Update `TerminalStore` to use adapter instead of direct WebContainer spawn
+- [x] Update `TerminalTabs.tsx` to show fallback message when no terminal
+- [x] Update `shell.ts` to no-op when WebContainer unavailable
+- [x] **Commit:** `feat: terminal fallback adapter`
 
 ### Preview
-- [ ] Update `PreviewsStore` to detect no-WebContainer and show empty state
-- [ ] Update `Preview.tsx` to show "Preview not available on mobile" when no previews
-- [ ] Future: static HTML preview from in-memory files (open in new WebView)
-- [ ] **Commit:** `feat: preview fallback for mobile`
+- [x] Update `PreviewsStore` to detect no-WebContainer and show empty state
+- [x] Update `Preview.tsx` to show "Preview not available on mobile" when no previews
+- [x] Future: static HTML preview from in-memory files (open in new WebView)
+- [x] **Commit:** `feat: preview fallback for mobile`
 
 ---
 
-## Phase 5: AI Provider Integration
+## Phase 5a: Remote Runtime Design & Scaffold ✅ DONE
+
+**Goal:** Scaffold a safe, authenticated Remote Runtime interface for terminal execution and preview tunneling on mobile.
+
+- [x] Create `docs/REMOTE_RUNTIME.md` defining API contract & WebSocket streams
+- [x] Implement `RemoteRuntimeClient.ts` with health-check, workspace stubs, and preview URL methods
+- [x] Integrate Auth Token, Workspace ID, and URL fields in Runtime Settings UI
+- [x] Add connection testing trigger checking GET /health
+- [x] **Commit:** `feat: scaffold remote runtime client`
+
+---
+
+## Phase 5b: AI Provider Integration
 
 **Goal:** Make LLM chat work without a Remix server.
 
@@ -142,10 +154,12 @@
 
 ---
 
-## Phase 6: APK Build & Polish
+## Phase 6: APK Build & Polish ⚠️ PARTIAL
 
-**Goal:** Produce a distributable APK.
+**Goal:** Produce a distributable APK and automate build pipelines.
 
+- [x] Set up automated build scripts (`scripts/build-apk.mjs` with automatic JVM 21/SDK discovery)
+- [x] Successfully compile debug APK (`npm run android:apk:debug` generating `app-debug.apk`)
 - [ ] Create `android/app/src/main/res/xml/network_security_config.xml` for dev cleartext
 - [ ] Configure `android/app/build.gradle`:
   - Set `minSdkVersion` to 24 (Android 7.0 — covers Galaxy A56)

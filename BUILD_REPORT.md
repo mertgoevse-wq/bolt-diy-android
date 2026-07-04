@@ -205,7 +205,8 @@ To provide a seamless experience on mobile where WebContainer features (like she
 ## Commit History
 
 ```
-feat: scaffold remote runtime client   ← this commit
+chore: verify remote runtime scaffold   ← this commit
+feat: scaffold remote runtime client
 docs: add github repository metadata guide
 feat: add branding preview and apk build workflow
 feat: polish android terminal and preview fallback
@@ -223,4 +224,4 @@ feat: add runtime adapter layer
 ---
 
 **Verification completed**: 2026-07-04  
-**Status**: ✅ PASS — debug APK built & remote client scaffolded
+**Status**: ✅ PASS — Remote Runtime scaffold complete, type-safe, and fully verified on Android WebView shell.

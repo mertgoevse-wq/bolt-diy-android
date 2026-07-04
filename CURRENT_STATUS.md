@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-04  
 **Branch:** `main`  
-**Commits ahead of upstream:** 12  
+**Commits ahead of upstream:** 15  
 **Target device:** Samsung Galaxy A56 (Android 15, 1080×2340)
 
 ---
@@ -242,54 +242,52 @@ bolt-diy-android/
 5. No-op `shell.ts` functions when WC unavailable.
 6. **Commit:** `feat: terminal and preview fallback for mobile`
 
-### Phase 5: AI Provider Integration
+### Phase 5: Remote Runtime Design & Scaffold ✅ COMPLETE
 
-1. Choose approach: **A)** Deploy Remix to Cloudflare Pages, proxy API calls; **B)** Client-side LLM via Capacitor HTTP.
-2. Create `app/lib/adapters/api-client.ts` — intercepts `/api/*` fetch calls.
-3. Convert critical routes: `api.chat.ts`, `api.llmcall.ts`, `api.models.ts`, `api.enhancer.ts`.
-4. Test LLM streaming end-to-end.
-5. **Commit:** `feat: client-side API adapter for Android`
+1. **Commit `66d0dc0` — "feat: scaffold remote runtime client"**
+2. Created `docs/REMOTE_RUNTIME.md` detailing the secure API contract and WS events.
+3. Implemented `RemoteRuntimeClient.ts` with health check, workspace stubs, and preview URL stubs.
+4. Integrated Auth Token, Workspace ID, and URL fields in the Runtime Settings UI with interactive connection testing check.
 
-### Phase 6: APK Build
+### Phase 6: APK Build & Polish ⚠️ PARTIAL
 
-1. Configure `AndroidManifest.xml` (permissions, orientation, cleartext).
-2. Set minSdk 24, add signing config in `build.gradle`.
-3. Generate app icons.
-4. Build release APK: `npm run android:build`.
-5. Test on Samsung Galaxy A56.
-6. **Commit:** `feat: production APK build configuration`
+1. **Commit `b00648c` — "feat: add branding preview and apk build workflow"**
+2. Set up automated build scripts (`scripts/build-apk.mjs` with automatic JVM 21/SDK discovery).
+3. Successfully compiled debug APK (`npm run android:apk:debug` generating `app-debug.apk`).
+4. Production release signing config is pending.
 
 ---
 
 ## Git State
 
 ```
-046ef5c docs: add android porting audit          ← HEAD
-de15701 feat: add android capacitor shell
-2e254ac feat: add web URL content fetcher         ← origin/main (upstream)
+66d0dc0 feat: scaffold remote runtime client          ← HEAD (main)
+6fd6a2e docs: add github repository metadata guide
+b00648c feat: add branding preview and apk build workflow
+80fa9c9 feat: polish android terminal and preview fallback
+117ba9f feat: add reliable android webview shell
 ```
 
-**Remote:** `origin → https://github.com/stackblitz-labs/bolt.diy.git`
-- This is the **upstream repository**, not a fork.
-- Push requires: (1) a fork or new repo, (2) GitHub authentication.
-- See "Push Status" section below.
+**Remote:** `origin → https://github.com/mertgoevse-wq/bolt-diy-android.git`
+- Push is fully working.
 
 ---
 
 ## Branding Pass ✅ COMPLETE
 
-**Commit: `chore: rebrand as bolt-diy-android`**
+**Commit: `b00648c` — "feat: add branding preview and apk build workflow"**
 
 | Item | Status | Details |
 |------|--------|---------|
 | Project name | ✅ | `bolt-diy-android` |
 | Display name | ✅ | `bolt.diy Android` |
 | Android package | ✅ | `com.mertgoevse.boltdiyandroid` |
-| README.md | ✅ | Replaced with Android-port README |
+| README.md | ✅ | Replaced with Android-port README and branding preview |
 | NOTICE.md | ✅ | Attribution and copyright |
-| BRANDING.md | ✅ | `docs/branding/BRANDING.md` |
+| BRANDING.md | ✅ | `BRANDING.md` |
 | New logo SVG | ✅ | `public/bolt-diy-android-logo.svg` |
 | New app icon SVG | ✅ | `public/bolt-diy-android-icon.svg` |
+| Social preview banner | ✅ | `public/bolt-diy-android-social-preview.svg` |
 | Android strings.xml | ✅ | App name → `bolt.diy Android` |
 | Android build.gradle | ✅ | namespace + applicationId updated |
 | MainActivity.java | ✅ | Moved to `com/mertgoevse/boltdiyandroid/` |

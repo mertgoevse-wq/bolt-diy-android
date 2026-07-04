@@ -136,6 +136,18 @@ export class RemoteRuntimeClient {
   }
 
   /**
+   * Get Preview URL (Stub): GET /workspace/:id/preview
+   */
+  async getPreviewUrl(): Promise<{ port: number; previewUrl: string }> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    console.log(`[RemoteRuntimeClient] Stub: getPreviewUrl for workspace ${this.workspaceId}`);
+    return { port: 5173, previewUrl: `${this.serverUrl}/workspace/${this.workspaceId}/preview` };
+  }
+
+  /**
    * WebSocket Connection (Stub): WS /workspace/:id/events
    */
   connectWebSocket(onMessage: (event: any) => void): WebSocket {
