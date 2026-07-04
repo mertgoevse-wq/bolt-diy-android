@@ -62,3 +62,10 @@ android/app/src/main/assets/public/
 !TODO_NEXT.md
 !src/mobile/adapters/README.md
 !CURRENT_STATUS.md
+!BRANDING.md
+!BUILD_REPORT.md
+
+# Package lock & generated gradle configs
+package-lock.json
+android/app/capacitor.build.gradle
+android/capacitor.settings.gradle

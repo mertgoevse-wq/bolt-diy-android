@@ -44,10 +44,11 @@ Then in Android Studio:
 ### Build APK from command line
 
 ```bash
-npm run android:build
+# Automated compilation of the Debug APK:
+npm run android:apk:debug
 ```
 
-This runs the web build, syncs to Android, and invokes Gradle to produce a release APK.
+This runs the Vite web build, syncs web assets into the Android native directories, and executes the Gradle wrapper to build the debug package at `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Running on a Device
 
@@ -102,6 +103,13 @@ npm run android:open   # open in Android Studio to run
 | `npm run android:build` | Full build: web + sync + Gradle APK |
 | `npm run android:run` | Build + deploy to connected device |
 | `npm run android:clean` | Clean Android build artifacts |
+| `npm run android:dev` | Start Vite dev server for Android SPA shell |
+| `npm run android:dev:host` | Start Vite dev server exposed on Wi-Fi (0.0.0.0) |
+| `npm run android:webpreview` | Serve the production SPA locally using Vite preview |
+| `npm run android:webpreview:host` | Serve production SPA exposed on Wi-Fi (0.0.0.0) |
+| `npm run android:apk:debug` | Run Capacitor sync and compile the Android Debug APK |
+| `npm run android:apk:release` | Compile the Android Release APK target |
+| `npm run android:apk:path` | Output the expected path to the Debug APK |
 
 ## What Works on Android
 

@@ -49,6 +49,13 @@
     "android:build": "npm run android:sync && cap build android",
     "android:run": "npm run android:sync && cap run android",
     "android:clean": "cap clean android",
+    "android:webpreview": "vite preview --config vite.android.config.ts",
+    "android:webpreview:host": "vite preview --config vite.android.config.ts --host 0.0.0.0",
+    "android:dev": "vite --config vite.android.config.ts",
+    "android:dev:host": "vite --config vite.android.config.ts --host 0.0.0.0",
+    "android:apk:debug": "node scripts/build-apk.mjs",
+    "android:apk:release": "node scripts/build-apk.mjs --release",
+    "android:apk:path": "node scripts/build-apk.mjs --path",
     "build:remix": "remix vite:build",
     "build:android": "node scripts/build-android.mjs"
   },
