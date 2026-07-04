@@ -18,6 +18,7 @@ import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
 import type { ActionAlert, DeployAlert, SupabaseAlert } from '~/types/actions';
+import { resetAndroidFallbackStorage, updateAndroidFallbackSession } from '~/lib/persistence/androidFallbackStorage';
 
 const { saveAs } = fileSaver;
 
@@ -77,6 +78,10 @@ export class WorkbenchStore {
         }
       }
     }
+
+    this.currentView.subscribe((view) => {
+      void updateAndroidFallbackSession({ currentView: view });
+    });
   }
 
   addToExecutionQueue(callback: () => Promise<void>) {
@@ -220,6 +225,18 @@ export class WorkbenchStore {
 
   setSelectedFile(filePath: string | undefined) {
     this.#editorStore.setSelectedFile(filePath);
+    void updateAndroidFallbackSession({ lastOpenedFile: filePath ?? undefined, activeWorkspace: 'default' });
+  }
+
+  async resetLocalAndroidWorkspace() {
+    this.#filesStore.files.set({});
+    this.#filesStore.resetFileModifications();
+    this.#editorStore.documents.set({});
+    this.#editorStore.selectedFile.set(undefined);
+    this.currentView.set('code');
+
+    await resetAndroidFallbackStorage();
+    await this.#filesStore.persistFallbackStateIfNeeded();
   }
 
   async saveFile(filePath: string) {

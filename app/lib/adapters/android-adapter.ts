@@ -25,12 +25,57 @@ import type {
   PathWatcherEvent,
 } from './types';
 import type { ITerminal } from '~/types/terminal';
+import {
+  loadAndroidFallbackState,
+  saveAndroidFallbackWorkspace,
+  type PersistedDirent,
+} from '~/lib/persistence/androidFallbackStorage';
 
 export class InMemoryFileSystem implements IFileSystem {
   private _files = new Map<string, string>();
   private _watchers = new Map<string, (event: PathWatcherEvent) => void>();
+  private _initialized = false;
+  private _initializationPromise: Promise<void> | null = null;
+
+  constructor() {
+    this._initializationPromise = this._hydrateFromStorage();
+  }
+
+  private async _ensureInitialized(): Promise<void> {
+    if (this._initialized) {
+      return;
+    }
+
+    await this._initializationPromise;
+  }
+
+  private async _hydrateFromStorage(): Promise<void> {
+    const state = await loadAndroidFallbackState();
+    const entries = Object.entries(state.workspace.files ?? {});
+
+    this._files = new Map();
+
+    for (const [path, dirent] of entries) {
+      if (dirent?.type === 'file' && typeof dirent.content === 'string') {
+        this._files.set(path, dirent.content);
+      }
+    }
+
+    this._initialized = true;
+  }
+
+  private async _persistState(): Promise<void> {
+    await this._ensureInitialized();
+
+    const files = Object.fromEntries(
+      Array.from(this._files.entries()).map(([path, content]) => [path, { type: 'file' as const, content }]),
+    );
+
+    await saveAndroidFallbackWorkspace(files as Record<string, PersistedDirent>, []);
+  }
 
   async readFile(path: string): Promise<{ content: string; isBinary: boolean }> {
+    await this._ensureInitialized();
     const content = this._files.get(path);
 
     if (content === undefined) {
@@ -41,17 +86,25 @@ export class InMemoryFileSystem implements IFileSystem {
   }
 
   async writeFile(path: string, content: string | Uint8Array): Promise<void> {
+    await this._ensureInitialized();
     const str = typeof content === 'string' ? content : new TextDecoder().decode(content);
     this._files.set(path, str);
+    await this._persistState();
     this._notifyWatchers({ path, type: 'change' });
   }
 
   async mkdir(path: string, _recursive?: boolean): Promise<void> {
-    // In-memory fs doesn't need real directories
+    await this._ensureInitialized();
+    if (!this._files.has(path)) {
+      this._files.set(path, '');
+      await this._persistState();
+    }
+
     this._notifyWatchers({ path, type: 'add' });
   }
 
   async readdir(path: string): Promise<Dirent[]> {
+    await this._ensureInitialized();
     const results: Dirent[] = [];
     const prefix = path.endsWith('/') ? path : path + '/';
 
@@ -75,26 +128,31 @@ export class InMemoryFileSystem implements IFileSystem {
   }
 
   async rm(path: string, _recursive?: boolean): Promise<void> {
+    await this._ensureInitialized();
     // Remove exact match and all children
     for (const key of this._files.keys()) {
       if (key === path || key.startsWith(path + '/')) {
         this._files.delete(key);
       }
     }
+    await this._persistState();
     this._notifyWatchers({ path, type: 'remove' });
   }
 
   async rename(oldPath: string, newPath: string): Promise<void> {
+    await this._ensureInitialized();
     const content = this._files.get(oldPath);
 
     if (content !== undefined) {
       this._files.set(newPath, content);
       this._files.delete(oldPath);
+      await this._persistState();
       this._notifyWatchers({ path: newPath, type: 'change' });
     }
   }
 
   async watch(path: string, callback: (event: PathWatcherEvent) => void): Promise<() => void> {
+    await this._ensureInitialized();
     this._watchers.set(path, callback);
 
     return () => {

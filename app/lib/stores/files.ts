@@ -21,6 +21,11 @@ import {
   migrateLegacyLocks,
   clearCache,
 } from '~/lib/persistence/lockedFiles';
+import {
+  loadAndroidFallbackState,
+  saveAndroidFallbackWorkspace,
+  type PersistedDirent,
+} from '~/lib/persistence/androidFallbackStorage';
 import { getCurrentChatId } from '~/utils/fileLocks';
 
 const logger = createScopedLogger('FilesStore');
@@ -555,6 +560,33 @@ export class FilesStore {
   }
 
   async saveFile(filePath: string, content: string) {
+    if (this.#isFallbackMode) {
+      const oldContent = this.getFile(filePath)?.content;
+
+      if (!oldContent && oldContent !== '') {
+        this.files.setKey(filePath, {
+          type: 'file',
+          content,
+          isBinary: false,
+          isLocked: false,
+        });
+      } else {
+        this.files.setKey(filePath, {
+          type: 'file',
+          content,
+          isBinary: false,
+          isLocked: this.getFile(filePath)?.isLocked ?? false,
+        });
+      }
+
+      if (!this.#modifiedFiles.has(filePath)) {
+        this.#modifiedFiles.set(filePath, oldContent ?? '');
+      }
+
+      await this.#persistFallbackState();
+      return;
+    }
+
     const webcontainer = await this.#webcontainer;
 
     try {
@@ -596,6 +628,66 @@ export class FilesStore {
     }
   }
 
+  async #hydrateFallbackState() {
+    if (!this.#isFallbackMode) {
+      return;
+    }
+
+    try {
+      const state = await loadAndroidFallbackState();
+      const persistedFiles = Object.entries(state.workspace.files ?? {}).reduce<FileMap>((acc, [filePath, dirent]) => {
+        if (!dirent) {
+          return acc;
+        }
+
+        acc[filePath] = {
+          type: dirent.type,
+          content: dirent.content ?? '',
+          isBinary: dirent.isBinary ?? false,
+          isLocked: dirent.isLocked ?? false,
+          lockedByFolder: dirent.lockedByFolder,
+        };
+
+        return acc;
+      }, {});
+
+      this.files.set(persistedFiles);
+      this.#deletedPaths = new Set(state.workspace.deletedPaths ?? []);
+      this.#size = Object.values(persistedFiles).filter((entry) => entry?.type === 'file').length;
+      this.#persistFallbackState();
+    } catch (error) {
+      logger.error('Failed to hydrate fallback state', error);
+    }
+  }
+
+  async #persistFallbackState() {
+    if (!this.#isFallbackMode) {
+      return;
+    }
+
+    const files = Object.entries(this.files.get()).reduce<Record<string, PersistedDirent>>((acc, [filePath, dirent]) => {
+      if (!dirent) {
+        return acc;
+      }
+
+      acc[filePath] = {
+        type: dirent.type,
+        content: dirent.type === 'file' ? dirent.content : undefined,
+        isBinary: dirent.type === 'file' ? dirent.isBinary : false,
+        isLocked: dirent.isLocked,
+        lockedByFolder: dirent.lockedByFolder,
+      };
+
+      return acc;
+    }, {});
+
+    try {
+      await saveAndroidFallbackWorkspace(files, Array.from(this.#deletedPaths));
+    } catch (error) {
+      logger.error('Failed to persist fallback state', error);
+    }
+  }
+
   async #init() {
     /*
      * In fallback mode (Android/no WebContainer), skip WebContainer initialization
@@ -603,6 +695,8 @@ export class FilesStore {
      */
     if (this.#isFallbackMode) {
       console.log('[FilesStore] Running in fallback mode — no WebContainer file watching');
+
+      await this.#hydrateFallbackState();
 
       // Clean up any files that were previously deleted
       this.#cleanupDeletedFiles();
@@ -815,6 +909,22 @@ export class FilesStore {
   }
 
   async createFile(filePath: string, content: string | Uint8Array = '') {
+    if (this.#isFallbackMode) {
+      const isBinary = content instanceof Uint8Array;
+      const contentToWrite = isBinary ? new TextDecoder().decode(content) : (content as string);
+
+      this.files.setKey(filePath, {
+        type: 'file',
+        content: contentToWrite,
+        isBinary,
+        isLocked: false,
+      });
+      this.#size += 1;
+      this.#modifiedFiles.set(filePath, contentToWrite);
+      await this.#persistFallbackState();
+      return true;
+    }
+
     const webcontainer = await this.#webcontainer;
 
     try {
@@ -868,6 +978,12 @@ export class FilesStore {
   }
 
   async createFolder(folderPath: string) {
+    if (this.#isFallbackMode) {
+      this.files.setKey(folderPath, { type: 'folder' });
+      await this.#persistFallbackState();
+      return true;
+    }
+
     const webcontainer = await this.#webcontainer;
 
     try {
@@ -891,6 +1007,19 @@ export class FilesStore {
   }
 
   async deleteFile(filePath: string) {
+    if (this.#isFallbackMode) {
+      this.#deletedPaths.add(filePath);
+      this.files.setKey(filePath, undefined);
+      this.#size = Math.max(0, this.#size - 1);
+
+      if (this.#modifiedFiles.has(filePath)) {
+        this.#modifiedFiles.delete(filePath);
+      }
+
+      await this.#persistFallbackState();
+      return true;
+    }
+
     const webcontainer = await this.#webcontainer;
 
     try {
@@ -923,6 +1052,31 @@ export class FilesStore {
   }
 
   async deleteFolder(folderPath: string) {
+    if (this.#isFallbackMode) {
+      this.#deletedPaths.add(folderPath);
+      this.files.setKey(folderPath, undefined);
+
+      const allFiles = this.files.get();
+
+      for (const [path, dirent] of Object.entries(allFiles)) {
+        if (path.startsWith(folderPath + '/')) {
+          this.files.setKey(path, undefined);
+          this.#deletedPaths.add(path);
+
+          if (dirent?.type === 'file') {
+            this.#size = Math.max(0, this.#size - 1);
+          }
+
+          if (dirent?.type === 'file' && this.#modifiedFiles.has(path)) {
+            this.#modifiedFiles.delete(path);
+          }
+        }
+      }
+
+      await this.#persistFallbackState();
+      return true;
+    }
+
     const webcontainer = await this.#webcontainer;
 
     try {
@@ -964,6 +1118,15 @@ export class FilesStore {
     } catch (error) {
       logger.error('Failed to delete folder\n\n', error);
       throw error;
+    }
+  }
+
+  /**
+   * Public method to persist fallback state. Called externally when needed.
+   */
+  async persistFallbackStateIfNeeded() {
+    if (this.#isFallbackMode) {
+      await this.#persistFallbackState();
     }
   }
 

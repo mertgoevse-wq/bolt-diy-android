@@ -12,7 +12,7 @@
  * for future use.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useStore } from '@nanostores/react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
@@ -24,6 +24,8 @@ import {
   resetRuntimeMode,
   type RuntimeMode,
 } from '~/lib/stores/runtime-mode';
+import { getAndroidFallbackPersistenceStatus } from '~/lib/persistence/androidFallbackStorage';
+import { workbenchStore } from '~/lib/stores/workbench';
 
 interface ModeOption {
   id: RuntimeMode;
@@ -37,6 +39,25 @@ interface ModeOption {
 export default function RuntimeModeTab() {
   const runtime = useStore(runtimeModeStore);
   const [urlInput, setUrlInput] = useState(runtime.remoteRuntimeUrl);
+  const [persistenceStatus, setPersistenceStatus] = useState({ available: false, hasSavedFiles: false, lastOpenedFile: undefined as string | undefined });
+
+  useEffect(() => {
+    let active = true;
+
+    async function refreshStatus() {
+      const status = await getAndroidFallbackPersistenceStatus();
+
+      if (active) {
+        setPersistenceStatus(status);
+      }
+    }
+
+    void refreshStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [runtime.mode, runtime.isAndroid]);
 
   const modes: ModeOption[] = [
     {
@@ -103,6 +124,18 @@ export default function RuntimeModeTab() {
   const handleReset = useCallback(() => {
     resetRuntimeMode();
     toast.success('Runtime mode reset to auto-detected value');
+  }, []);
+
+  const handleResetWorkspace = useCallback(async () => {
+    try {
+      await workbenchStore.resetLocalAndroidWorkspace();
+      const status = await getAndroidFallbackPersistenceStatus();
+      setPersistenceStatus(status);
+      toast.success('Local Android workspace cleared');
+    } catch (error) {
+      console.error(error);
+      toast.error('Unable to reset local Android workspace');
+    }
   }, []);
 
   return (
@@ -174,6 +207,23 @@ export default function RuntimeModeTab() {
               {runtime.isAndroid ? 'Yes' : 'No'}
             </span>
           </div>
+        </div>
+
+        <div className="rounded-md border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+          <div className="flex items-center justify-between gap-3">
+            <span>{persistenceStatus.hasSavedFiles ? 'Saved locally on Android' : 'No local Android workspace yet'}</span>
+            {runtime.isAndroid && (
+              <button
+                onClick={handleResetWorkspace}
+                className="rounded-md border border-emerald-700/20 px-2.5 py-1 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+              >
+                Reset local Android workspace
+              </button>
+            )}
+          </div>
+          {persistenceStatus.lastOpenedFile && (
+            <div className="mt-1 text-xs opacity-80">Last opened: {persistenceStatus.lastOpenedFile}</div>
+          )}
         </div>
       </motion.div>
 
