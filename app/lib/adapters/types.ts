@@ -88,7 +88,7 @@ export interface PlatformAdapter {
    * Spawn a terminal shell process.
    * On Android, this returns a stub/blocked process.
    */
-  spawnShell(terminal: import '~/types/terminal'.ITerminal): Promise<ITerminalProcess>;
+  spawnShell(terminal: import('~/types/terminal').ITerminal): Promise<ITerminalProcess>;
 
   /**
    * Execute a command and return its output.

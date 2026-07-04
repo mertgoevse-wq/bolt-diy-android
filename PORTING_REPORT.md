@@ -282,3 +282,108 @@ Android WebView (Capacitor)
 - `android/app/src/main/res/values/strings.xml` — app name
 - NEW: `android/app/src/main/res/xml/network_security_config.xml` — cleartext for dev
 - `.env.local` or build-time env injection for API keys
+
+---
+
+## 8. Runtime Adapter Layer (Phase 1 — Completed)
+
+**Date added:** 2026-07-04
+**Commit:** feat: add runtime adapter layer
+
+### 8.1 What Was Created
+
+A new `src/mobile/adapters/runtime/` directory with a high-level
+`RuntimeAdapter` interface that abstracts all WebContainer-dependent
+operations:
+
+```
+src/mobile/adapters/runtime/
+├── RuntimeAdapter.ts               # Interface + types + UnsupportedFeatureError
+├── WebContainerRuntimeAdapter.ts   # Desktop: wraps @webcontainer/api
+├── AndroidFallbackRuntimeAdapter.ts # Android: in-memory FS, stub terminal
+└── index.ts                        # Factory (getRuntimeAdapter) + re-exports
+```
+
+### 8.2 Interface Design
+
+The `RuntimeAdapter` interface defines methods for:
+
+| Method Group | Methods | WebContainer | Android |
+|-------------|---------|:---:|:---:|
+| Lifecycle | `boot()`, `isReady()`, `shutdown()` | ✅ | ✅ (no-op) |
+| File system | `readFile`, `writeFile`, `mkdir`, `readdir`, `rm`, `rename`, `watch` | ✅ | ✅ (in-memory) |
+| Terminal | `spawnShell()`, `executeCommand()` | ✅ | ❌ stub |
+| Dependencies | `installDependencies()` | ✅ | ❌ |
+| Dev server | `startDevServer()` | ✅ | ❌ |
+| Preview | `onServerReady`, `onPortEvent`, `getPreviewUrl`, `getPreviews` | ✅ | ❌ |
+| Inspector | `onPreviewMessage`, `setPreviewScript` | ✅ | ❌ (no-op) |
+| Capabilities | `getCapabilities()` | all true | fileSystem only |
+
+### 8.3 Capability Flags
+
+`getCapabilities()` returns a `RuntimeCapabilities` object with explicit
+boolean flags for each feature. UI components can check these before
+showing/hiding features:
+
+```typescript
+interface RuntimeCapabilities {
+  fileSystem: boolean;
+  terminal: boolean;
+  commandExecution: boolean;
+  packageInstall: boolean;
+  devServer: boolean;
+  preview: boolean;
+  gitClone: boolean;
+  persistentFileSystem: boolean;
+}
+```
+
+### 8.4 Relationship to Existing Adapters
+
+The existing `app/lib/adapters/` layer (PlatformAdapter interface,
+platform detection, webcontainer-adapter, android-adapter) is **not
+removed or changed**. The new `RuntimeAdapter` is a higher-level
+abstraction that builds on the same platform detection utilities
+(`isWebContainerSupported()`, `isCapacitor()`, etc.).
+
+### 8.5 WebContainer API Import Audit (Exact Files)
+
+All 14 files that import `@webcontainer/api`:
+
+| # | File | Import | Status |
+|---|------|--------|--------|
+| 1 | `app/lib/webcontainer/index.ts` | `WebContainer` (class) | Phase 2 — will use adapter.boot() |
+| 2 | `app/lib/stores/files.ts` | `WebContainer` (type) | Phase 3 — will accept RuntimeAdapter |
+| 3 | `app/lib/stores/terminal.ts` | `WebContainer, WebContainerProcess` (type) | Phase 4 |
+| 4 | `app/lib/stores/previews.ts` | `WebContainer` (type) | Phase 5 |
+| 5 | `app/lib/stores/workbench.ts` | (imports webcontainer promise) | Phase 3 |
+| 6 | `app/lib/runtime/action-runner.ts` | `WebContainer` (type) | Phase 4 |
+| 7 | `app/lib/hooks/useGit.ts` | `WebContainer` (type) | Phase 5 |
+| 8 | `app/utils/shell.ts` | `WebContainer, WebContainerProcess` (type) | Phase 4 |
+| 9 | `app/components/workbench/Search.tsx` | `WebContainer` (type) | Phase 5 |
+| 10 | `app/lib/webcontainer/auth.client.ts` | re-export of `auth` | N/A (unused on Android) |
+| 11 | `app/lib/adapters/webcontainer-adapter.ts` | `WebContainer` (class) | Existing adapter (kept) |
+| 12 | `app/routes/webcontainer.connect.$id.tsx` | dynamic CDN import | N/A (skip route) |
+| 13 | `app/routes/webcontainer.preview.$id.tsx` | (indirect) | N/A (skip route) |
+| 14 | `app/lib/runtime/enhanced-message-parser.ts` | (indirect reference) | Phase 4 |
+
+### 8.6 UnsupportedFeatureError
+
+The adapter defines a standard error class for unsupported features:
+
+```typescript
+class UnsupportedFeatureError extends Error {
+  readonly capability: keyof RuntimeCapabilities;
+  // e.g. new UnsupportedFeatureError('devServer', 'android')
+}
+```
+
+This lets UI components show targeted "this feature is not available on
+your device" messages instead of generic errors.
+
+### 8.7 Future: RemoteRuntimeAdapter
+
+The `AndroidFallbackRuntimeAdapter` is designed to be replaceable by a
+`RemoteRuntimeAdapter` that connects to a server-side sandbox over
+WebSocket. The interface is identical — only the implementation changes.
+This is the path to full feature parity on Android without WebContainer.

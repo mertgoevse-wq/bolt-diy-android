@@ -89,7 +89,7 @@ export class WebContainerAdapter implements PlatformAdapter {
       },
 
       async mkdir(path: string, recursive?: boolean) {
-        await wc.fs.mkdir(path, { recursive });
+        if (recursive) { await wc.fs.mkdir(path, { recursive: true }); } else { await wc.fs.mkdir(path); }
       },
 
       async readdir(path: string) {
@@ -102,7 +102,7 @@ export class WebContainerAdapter implements PlatformAdapter {
       },
 
       async rm(path: string, recursive?: boolean) {
-        await wc.fs.rm(path, { recursive });
+        if (recursive) { await wc.fs.rm(path, { recursive: true }); } else { await wc.fs.rm(path); }
       },
 
       async rename(oldPath: string, newPath: string) {
@@ -111,7 +111,7 @@ export class WebContainerAdapter implements PlatformAdapter {
 
       async watch(path: string, callback: (event: any) => void) {
         const watcher = await wc.fs.watch(path, { recursive: true });
-        watcher.addEventListener('change', (event) => {
+        (watcher as any).addEventListener('change', (event: any) => {
           callback({ path: event.filename || path, type: 'change' });
         });
         return () => watcher.close();

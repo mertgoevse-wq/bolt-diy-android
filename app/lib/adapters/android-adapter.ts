@@ -120,7 +120,7 @@ export class InMemoryFileSystem implements IFileSystem {
  * "not available" message.
  */
 class StubTerminalProcess implements ITerminalProcess {
-  private outputController: ReadableStreamDefaultController<string>;
+  private outputController!: ReadableStreamDefaultController<string>;
   readonly output: ReadableStream<string>;
   readonly input: WritableStreamDefaultWriter<string>;
   private alive = true;
