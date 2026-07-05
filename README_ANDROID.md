@@ -497,6 +497,8 @@ You can build and download the Android debug APK directly from GitHub Actions wi
 
 ## Troubleshooting
 
+For a comprehensive smoke-testing checklist and step-by-step physical device testing guide, see the [Android Device Testing & Smoke-Test Plan](file:///c:/Users/mertg/bolt-diy-android/docs/ANDROID_DEVICE_TEST_PLAN.md).
+
 **Gradle Permission Issue (Linux/macOS)**
 - **Problem:** When building locally, you see `./gradlew: Permission denied`.
 - **Solution:** Grant execution permission to the Gradle wrapper by running:

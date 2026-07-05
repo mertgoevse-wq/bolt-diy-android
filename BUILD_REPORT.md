@@ -418,7 +418,8 @@ No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing
 ## Commit History
 
 ```
-feat: complete remote git workflow wiring        ← this commit
+docs: add android device test plan               ← this commit
+feat: complete remote git workflow wiring
 ad1ffa6 ci: add debug apk artifact workflow
 feat: connect android settings to remote runtime
 5f8b651 feat: scaffold secure remote runtime server
@@ -430,4 +431,4 @@ e94c805 chore: verify remote runtime scaffold
 ---
 
 **Verification completed**: 2026-07-05  
-**Status**: ✅ PASS — Remote Git client API wired, front-end sync actions integrated, and Android debug APK successfully compiled.
+**Status**: ✅ PASS — Android device testing plan compiled, settings info card updated, and debug APK built.

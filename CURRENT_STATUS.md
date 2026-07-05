@@ -126,6 +126,7 @@ bolt-diy-android/
 ├── PORTING_REPORT.md            # NEW — dependency audit
 ├── TODO_NEXT.md                 # NEW — phased plan
 ├── README_ANDROID.md            # NEW — setup guide
+├── docs/ANDROID_DEVICE_TEST_PLAN.md # NEW — device testing plan
 ├── src/mobile/adapters/         # NEW — mobile adapter docs
 │   └── README.md
 └── package.json                 # MODIFIED — Capacitor deps + 7 android scripts
@@ -154,7 +155,7 @@ bolt-diy-android/
 | Remote Runtime command profiles | ✅ MVP complete | Safe allowlisted npm/pnpm install/dev/build profiles with WebSocket output, stop, and command status panel |
 | Remote Runtime live preview | ✅ MVP complete | Tracks `npm run dev` / `pnpm run dev` output, returns JSON preview status, and loads detected LAN preview URLs on Android |
 | Android LLM API bridge | ✅ Scaffold complete | Recommends separate authenticated backend; provider keys stay server-side; production chat not connected yet |
-| Device tested | ❌ Not yet | No physical device testing done |
+| Device tested | ⚠️ Test plan ready | Phase 5.7: `docs/ANDROID_DEVICE_TEST_PLAN.md` created for Samsung Galaxy A56 testing |
 
 ---
 

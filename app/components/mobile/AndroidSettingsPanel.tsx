@@ -749,15 +749,42 @@ export default function AndroidSettingsPanel() {
             <div className="i-ph:info-fill" />
             About
           </h2>
-          <div className="android-card-content android-about">
-            <p className="android-about-name">bolt.diy Android</p>
-            <p className="android-about-version">v1.0.0</p>
-            <p className="android-about-desc">
+          <div className="android-card-content android-about space-y-2">
+            <p className="android-about-name font-bold text-bolt-elements-textPrimary">bolt.diy Android</p>
+            <p className="android-about-version text-xs text-bolt-elements-textSecondary">v1.0.0 (Debug build)</p>
+            <p className="text-xs text-bolt-elements-textSecondary">Build Date: 2026-07-05</p>
+            
+            <div className="border-t border-bolt-elements-borderColor/30 my-2 pt-2 text-xs">
+              <span className="text-bolt-elements-textSecondary">Runtime Mode: </span>
+              <span className="font-semibold text-bolt-elements-textPrimary">
+                {runtime.mode === 'remote' ? 'Remote Runtime' : 'Android Fallback (Local)'}
+              </span>
+            </div>
+
+            {runtime.mode === 'remote' && (
+              <div className="text-xs">
+                <span className="text-bolt-elements-textSecondary">Remote Status: </span>
+                <span className={classNames(
+                  'font-semibold',
+                  connectionState === 'connected' && 'text-green-500',
+                  connectionState === 'failed' && 'text-red-500',
+                  connectionState === 'checking' && 'text-blue-500',
+                  connectionState === 'disconnected' && 'text-gray-500'
+                )}>
+                  {connectionState === 'connected' && 'Connected'}
+                  {connectionState === 'failed' && 'Failed'}
+                  {connectionState === 'checking' && 'Checking…'}
+                  {connectionState === 'disconnected' && 'Disconnected'}
+                </span>
+              </div>
+            )}
+
+            <p className="android-about-desc text-xs text-bolt-elements-textTertiary leading-normal mt-2">
               Android port of bolt.diy — AI-powered code generation in your pocket.
-              WebContainer features (terminal, dev server, preview) require a desktop browser.
+              WebContainer features (terminal, dev server, preview) require a desktop browser or a connected Remote Runtime.
             </p>
             <button
-              className="android-secondary-btn"
+              className="android-secondary-btn mt-3 w-full py-1.5 rounded-lg text-xs"
               onClick={() => {
                 resetRuntimeMode();
                 toast.info('Runtime mode reset to auto-detected');

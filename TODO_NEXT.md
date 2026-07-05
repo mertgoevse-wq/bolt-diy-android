@@ -273,6 +273,7 @@
 - [x] Set up automated build scripts (`scripts/build-apk.mjs` with automatic JVM 21/SDK discovery)
 - [x] Successfully compile debug APK (`npm run android:apk:debug` generating `app-debug.apk`)
 - [x] Create GitHub Actions workflow for debug APK artifact (`.github/workflows/android-debug-apk.yml`) triggered manually via `workflow_dispatch`
+- [x] Create comprehensive device test plan and smoke-test checklist (`docs/ANDROID_DEVICE_TEST_PLAN.md`)
 - [ ] Create `android/app/src/main/res/xml/network_security_config.xml` for dev cleartext
 - [ ] Configure `android/app/build.gradle`:
   - Set `minSdkVersion` to 24 (Android 7.0 — covers Galaxy A56)
