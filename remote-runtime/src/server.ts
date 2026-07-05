@@ -24,6 +24,7 @@ import {
   type CommandEvent,
 } from './commands.js';
 import { getWorkspacePreview, observePreviewCommandEvent } from './preview.js';
+import { gitStatus, gitInit, gitCommit, gitSetRemote, gitPush } from './git.js';
 
 dotenv.config();
 
@@ -383,6 +384,140 @@ app.post('/workspace/:id/commands/:commandId/stop', requireAuth, (req, res) => {
 
   res.status(200).json(stoppedCommand);
 });
+
+/**
+ * GET /workspace/:id/git/status
+ */
+app.get('/workspace/:id/git/status', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  try {
+    const result = await gitStatus(getWorkspacePath(id));
+    if (!result.ok) {
+      jsonError(res, 500, result.error || 'Failed to check git status.');
+      return;
+    }
+    res.status(200).json({ ok: true, status: result.status });
+  } catch (error: any) {
+    console.error(`[RemoteRuntime] Error in git status for ${id}`, error);
+    jsonError(res, 500, error.message || 'Internal server error');
+  }
+});
+
+/**
+ * POST /workspace/:id/git/init
+ */
+app.post('/workspace/:id/git/init', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  try {
+    const result = await gitInit(getWorkspacePath(id));
+    if (!result.ok) {
+      jsonError(res, 500, result.error || 'Failed to initialize git repository.');
+      return;
+    }
+    res.status(200).json({ ok: true, output: result.output });
+  } catch (error: any) {
+    console.error(`[RemoteRuntime] Error in git init for ${id}`, error);
+    jsonError(res, 500, error.message || 'Internal server error');
+  }
+});
+
+/**
+ * POST /workspace/:id/git/commit
+ */
+app.post('/workspace/:id/git/commit', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { message } = req.body ?? {};
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    jsonError(res, 400, 'Commit message is required and must be a non-empty string.');
+    return;
+  }
+
+  try {
+    const result = await gitCommit(getWorkspacePath(id), message);
+    if (!result.ok) {
+      jsonError(res, 500, result.error || 'Failed to commit changes.');
+      return;
+    }
+    res.status(200).json({ ok: true, output: result.output });
+  } catch (error: any) {
+    console.error(`[RemoteRuntime] Error in git commit for ${id}`, error);
+    jsonError(res, 500, error.message || 'Internal server error');
+  }
+});
+
+/**
+ * POST /workspace/:id/git/push
+ */
+app.post('/workspace/:id/git/push', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { token, repoUrl } = req.body ?? {};
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  try {
+    // Set remote URL if provided
+    if (repoUrl) {
+      const remoteResult = await gitSetRemote(getWorkspacePath(id), repoUrl);
+      if (!remoteResult.ok) {
+        jsonError(res, 500, remoteResult.error || 'Failed to set remote URL.');
+        return;
+      }
+    }
+
+    const result = await gitPush(getWorkspacePath(id), token, repoUrl);
+    if (!result.ok) {
+      jsonError(res, 400, result.error || 'Push check failed.');
+      return;
+    }
+
+    res.status(200).json({ ok: true, output: result.output });
+  } catch (error: any) {
+    console.error(`[RemoteRuntime] Error in git push for ${id}`, error);
+    jsonError(res, 500, error.message || 'Internal server error');
+  }
+});
+
 
 /**
  * WebSocket upgrade validation & attachment

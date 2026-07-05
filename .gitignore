@@ -66,6 +66,8 @@ android/app/src/main/assets/public/
 !BUILD_REPORT.md
 !docs/github-repo-settings.md
 !docs/REMOTE_RUNTIME.md
+!docs/REMOTE_GIT_WORKFLOW.md
+!docs/ANDROID_LLM_API_BRIDGE.md
 
 # Package lock & generated gradle configs
 package-lock.json

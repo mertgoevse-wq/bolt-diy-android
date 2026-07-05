@@ -1,7 +1,7 @@
 # TODO: Next Steps for Android Port
 
 **Last updated:** 2026-07-05
-**Current phase:** Phase 0, 1, 3, 4, 5.3, 5.4, 5.5, 5.6, 6 (debug compile & GitHub Actions workflow) complete; Phase 2 (mobile UI) and Android API Backend implementation next.
+**Current phase:** Phase 0, 1, 3, 4, 5.3, 5.4, 5.5, 5.6, 5.7b (Git scaffold), 6 (debug compile & GitHub Actions workflow) complete; Phase 2 (mobile UI) and Android API Backend implementation next.
 
 ---
 
@@ -249,6 +249,19 @@
 - [ ] Preserve existing desktop/WebContainer/Remix behavior
 - [ ] Test LLM streaming end-to-end on device
 - [ ] **Commit:** `feat: connect android chat to api backend`
+
+---
+
+## Phase 5.7b: Remote Runtime Git Workflow Scaffold ✅ DONE
+
+**Goal:** Scaffold a safe Git workflow through Remote Runtime for Android commits and pushes.
+
+- [x] Create design document `docs/REMOTE_GIT_WORKFLOW.md`
+- [x] Implement safe shell-less git command executor in `remote-runtime/src/git.ts` using `execFile`
+- [x] Integrate git endpoints `/workspace/:id/git/status`, `/git/init`, `/git/commit`, `/git/push` in `remote-runtime/src/server.ts`
+- [x] Update client UI `GitHubSyncPanel.tsx` to require a Remote Runtime and explain future workflow
+- [x] Run typescript and compile builds
+- [x] **Commit:** `feat: scaffold remote git workflow`
 
 ---
 

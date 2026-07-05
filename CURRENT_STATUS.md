@@ -268,9 +268,17 @@ bolt-diy-android/
 6. Connected Settings UI on Android to execute live `/health` status tests and `/workspace` creations.
 7. Workspace ID configuration is successfully persisted and connection state indicators render in UI.
 
+### Phase 5.7: Remote Runtime Git Workflow Scaffold ✅ COMPLETE
+
+1. **Commit [HEAD] — "feat: scaffold remote git workflow"**
+2. Created `docs/REMOTE_GIT_WORKFLOW.md` detailing the secure Git API specifications.
+3. Implemented safe Git command execution engine using `execFile` (shell-less) in `remote-runtime/src/git.ts`.
+4. Exposed endpoints `/workspace/:id/git/status`, `/git/init`, `/git/commit`, `/git/push` with authentication and workspace validation in `remote-runtime/src/server.ts`.
+5. Updated client settings UI `GitHubSyncPanel.tsx` to require a Remote Runtime and show future workflow hints.
+
 ### Phase 6: APK Build & Polish ✅ COMPLETE
 
-1. **Commit [HEAD] — "ci: add debug apk artifact workflow"**
+1. **Commit `ad1ffa6` — "ci: add debug apk artifact workflow"**
 2. Set up automated build scripts (`scripts/build-apk.mjs` with automatic JVM 21/SDK discovery).
 3. Successfully compiled debug APK locally (`npm run android:apk:debug` generating `app-debug.apk`).
 4. Implemented manual trigger (`workflow_dispatch`) GitHub Actions workflow at `.github/workflows/android-debug-apk.yml` to compile and upload `app-debug.apk` as a workflow artifact.
@@ -281,11 +289,11 @@ bolt-diy-android/
 ## Git State
 
 ```
-[HEAD] ci: add debug apk artifact workflow
+[HEAD] feat: scaffold remote git workflow
+ad1ffa6 ci: add debug apk artifact workflow
 feat: connect android settings to remote runtime
 5f8b651 feat: scaffold secure remote runtime server
 e94c805 chore: verify remote runtime scaffold
-66d0dc0 feat: scaffold remote runtime client
 ```
 
 **Remote:** `origin → https://github.com/mertgoevse-wq/bolt-diy-android.git`

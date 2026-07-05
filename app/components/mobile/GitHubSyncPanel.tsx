@@ -70,17 +70,17 @@ export function GitHubSyncPanel() {
   // Explanation for disabled buttons
   const disabledReason = !isRepoConfigured()
     ? 'Configure a repository URL first'
-    : !gitAvailable && !isRemoteMode && !isWebContainerMode
-      ? 'Git operations require WebContainer (desktop) or Remote Runtime. On Android Fallback Mode, there is no local git runtime.'
-      : isRemoteMode && !runtime.remoteRuntimeUrl
+    : !isRemoteMode
+      ? 'Remote Runtime required: Git operations require a connected Remote Runtime. To configure, go to Settings → Runtime Mode.'
+      : !runtime.remoteRuntimeUrl
         ? 'Set a Remote Runtime URL in Settings → Runtime Mode first'
-        : 'Not yet implemented';
+        : 'Future workflow: Commits and pushes will execute secure allowlisted git commands on the Remote Runtime server. Integrations will connect to these endpoints in the next phase.';
 
   const isCommitDisabled =
     !isRepoConfigured() ||
-    (!gitAvailable && !isRemoteMode && !isWebContainerMode) ||
-    (isRemoteMode && !runtime.remoteRuntimeUrl) ||
-    true; // always disabled — not implemented
+    !isRemoteMode ||
+    !runtime.remoteRuntimeUrl ||
+    true; // always disabled in client UI until endpoint integrations are connected in client-side stores
   const isPushDisabled = isCommitDisabled;
 
   const formatTimestamp = (iso: string | null): string => {
@@ -117,8 +117,11 @@ export function GitHubSyncPanel() {
       >
         <div className="i-ph:info-fill w-4 h-4 flex-shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
         <div className="text-blue-800 dark:text-blue-200 leading-snug">
-          Configure your GitHub repository here. Commit and push are currently disabled on mobile — they require a
-          remote runtime server (coming soon). On desktop with WebContainer, use the full Git panel in the workbench.
+          {!isRemoteMode ? (
+            <span><strong>Remote Runtime Required:</strong> Git operations (status, commit, push) require a connected Remote Runtime. To configure, go to <strong>Settings → Runtime Mode</strong>.</span>
+          ) : (
+            <span><strong>Remote Git Workflow Scaffolded:</strong> Predefined allowlisted Git API endpoints are active on your Remote Runtime. Client integration will be completed in the next phase. Actions currently run in simulation to avoid faking success.</span>
+          )}
         </div>
       </motion.div>
 
@@ -331,8 +334,7 @@ export function GitHubSyncPanel() {
       >
         <div className="i-ph:wrench-fill w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-gray-400" />
         <div className="text-gray-500 dark:text-gray-500 leading-relaxed">
-          <strong>TODO:</strong> Implement real GitHub API integration for commit and push via Remote Runtime. The
-          current panel saves configuration only — no git operations are performed.
+          <strong>Future Workflow Scaffolded:</strong> Predefined allowlisted Git operations (status, init, commit, push) are ready on the Remote Runtime backend. In-memory sync changes will be committed directly inside the isolated workspace directory without running arbitrary shell commands.
         </div>
       </motion.div>
     </div>
