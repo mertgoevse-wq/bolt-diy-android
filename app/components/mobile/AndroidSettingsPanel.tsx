@@ -27,6 +27,7 @@ import {
 import { getAndroidFallbackPersistenceStatus } from '~/lib/persistence/androidFallbackStorage';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
+import { AndroidApiClient } from '~/lib/android-api/AndroidApiClient';
 import { RemoteRuntimeClient } from '~/lib/remote-runtime/RemoteRuntimeClient';
 import {
   getMissingRemoteRuntimeConfig,
@@ -41,6 +42,17 @@ interface PersistenceStatus {
   available: boolean;
   hasSavedFiles: boolean;
   lastOpenedFile?: string;
+}
+
+const ANDROID_API_BACKEND_URL_KEY = 'bolt_android_api_backend_url';
+const ANDROID_API_BACKEND_TOKEN_KEY = 'bolt_android_api_backend_token';
+
+function loadLocalSetting(key: string): string {
+  try {
+    return localStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
 }
 
 export default function AndroidSettingsPanel() {
@@ -59,6 +71,13 @@ export default function AndroidSettingsPanel() {
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [syncingAction, setSyncingAction] = useState<'push' | 'pull' | 'current-file' | null>(null);
   const [syncStatus, setSyncStatus] = useState<RemoteWorkspaceSyncStatus>(() => getSyncStatus());
+  const [apiBackendUrlInput, setApiBackendUrlInput] = useState(() => loadLocalSetting(ANDROID_API_BACKEND_URL_KEY));
+  const [apiBackendTokenInput, setApiBackendTokenInput] = useState(() => loadLocalSetting(ANDROID_API_BACKEND_TOKEN_KEY));
+  const [apiBackendState, setApiBackendState] = useState<'not-configured' | 'checking' | 'connected' | 'failed'>(
+    apiBackendUrlInput.trim() ? 'not-configured' : 'not-configured',
+  );
+  const [apiBackendError, setApiBackendError] = useState<string | null>(null);
+  const [testingApiBackend, setTestingApiBackend] = useState(false);
 
   useEffect(() => {
     setUrlInput(runtime.remoteRuntimeUrl);
@@ -101,6 +120,65 @@ export default function AndroidSettingsPanel() {
     setRemoteWorkspaceId(workspaceInput.trim());
     toast.success('Workspace ID saved');
   }, [workspaceInput]);
+
+  const handleApiBackendSave = useCallback(() => {
+    const trimmedUrl = apiBackendUrlInput.trim();
+    const trimmedToken = apiBackendTokenInput.trim();
+
+    if (
+      trimmedUrl &&
+      !trimmedUrl.startsWith('http://') &&
+      !trimmedUrl.startsWith('https://')
+    ) {
+      toast.error('Android API Backend URL must start with http:// or https://');
+      return;
+    }
+
+    try {
+      localStorage.setItem(ANDROID_API_BACKEND_URL_KEY, trimmedUrl);
+      localStorage.setItem(ANDROID_API_BACKEND_TOKEN_KEY, trimmedToken);
+      toast.success(trimmedUrl ? 'Android API Backend settings saved' : 'Android API Backend URL cleared');
+      setApiBackendState(trimmedUrl ? 'not-configured' : 'not-configured');
+      setApiBackendError(null);
+    } catch {
+      toast.error('Failed to save Android API Backend settings');
+    }
+  }, [apiBackendTokenInput, apiBackendUrlInput]);
+
+  const handleTestApiBackend = useCallback(async () => {
+    const trimmedUrl = apiBackendUrlInput.trim();
+
+    if (!trimmedUrl) {
+      toast.error('Android API Backend URL is required to test the backend');
+      return;
+    }
+
+    setTestingApiBackend(true);
+    setApiBackendState('checking');
+    setApiBackendError(null);
+
+    try {
+      const client = new AndroidApiClient({
+        baseUrl: trimmedUrl,
+        token: apiBackendTokenInput.trim(),
+      });
+      const response = await client.health();
+
+      if (!response.ok) {
+        throw new Error(response.message || 'Backend responded with an invalid health payload.');
+      }
+
+      setApiBackendState('connected');
+      toast.success(`Android API Backend connected${response.service ? `: ${response.service}` : ''}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Android API Backend test failed';
+      setApiBackendState('failed');
+      setApiBackendError(message);
+      toast.error(message);
+    } finally {
+      setTestingApiBackend(false);
+    }
+  }, [apiBackendTokenInput, apiBackendUrlInput]);
 
   const handleTestConnection = useCallback(async () => {
     const trimmedUrl = urlInput.trim();
@@ -308,6 +386,90 @@ export default function AndroidSettingsPanel() {
                   <span className={enabled ? 'android-cap-label-enabled' : 'android-cap-label-disabled'}>{label}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Android API Backend Card */}
+        <section className="android-card">
+          <h2 className="android-card-title">
+            <div className="i-ph:cloud-check-fill" />
+            Android API Backend
+          </h2>
+          <div className="android-card-content gap-3.5">
+            <p className="text-xs text-bolt-elements-textSecondary leading-relaxed">
+              LLM chat on Android needs an authenticated backend because Remix API routes do not run inside the WebView.
+              Provider keys stay on that backend and must never be bundled into the Android app.
+            </p>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-bolt-elements-textTertiary font-semibold uppercase tracking-wider">
+                Android API Backend URL
+              </span>
+              <input
+                type="text"
+                value={apiBackendUrlInput}
+                onChange={(event) => {
+                  setApiBackendUrlInput(event.target.value);
+                  setApiBackendState('not-configured');
+                }}
+                placeholder="https://api.example.com/android"
+                className="px-3 py-1.5 rounded-lg text-xs bg-[#0A0A0A] border border-bolt-elements-borderColor text-bolt-elements-textPrimary focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-bolt-elements-textTertiary"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-bolt-elements-textTertiary font-semibold uppercase tracking-wider">
+                Backend Auth Token
+              </span>
+              <input
+                type="password"
+                value={apiBackendTokenInput}
+                onChange={(event) => setApiBackendTokenInput(event.target.value)}
+                placeholder="Backend token, not provider API key"
+                className="px-3 py-1.5 rounded-lg text-xs bg-[#0A0A0A] border border-bolt-elements-borderColor text-bolt-elements-textPrimary focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-bolt-elements-textTertiary"
+              />
+            </div>
+
+            {!apiBackendUrlInput.trim() && (
+              <div className="text-[10px] text-amber-400 bg-amber-950/20 border border-amber-900/50 rounded-lg p-2">
+                Android LLM chat is not configured yet. Add a backend URL after deploying a secure API bridge.
+              </div>
+            )}
+
+            {apiBackendError && (
+              <div className="text-[10px] text-red-400 bg-red-950/20 border border-red-900/50 rounded-lg p-2 break-all">
+                <strong>Error:</strong> {apiBackendError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className={classNames('font-semibold uppercase text-[10px] px-2.5 py-0.5 rounded-full border', {
+                  'bg-gray-500/10 border-gray-500/30 text-gray-400': apiBackendState === 'not-configured',
+                  'bg-purple-500/10 border-purple-500/30 text-purple-400': apiBackendState === 'checking',
+                  'bg-green-500/10 border-green-500/30 text-green-400': apiBackendState === 'connected',
+                  'bg-red-500/10 border-red-500/30 text-red-400': apiBackendState === 'failed',
+                })}
+              >
+                {apiBackendState}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleApiBackendSave}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={handleTestApiBackend}
+                  disabled={testingApiBackend || !apiBackendUrlInput.trim()}
+                  className="android-secondary-btn text-xs font-semibold px-3.5 py-1.5 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className={testingApiBackend ? 'i-ph:spinner-gap animate-spin' : 'i-ph:plugs-fill'} />
+                  <span>Test API Backend</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>

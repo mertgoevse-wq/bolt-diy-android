@@ -147,19 +147,20 @@ bolt-diy-android/
 | File system on Android | ✅ IndexedDB persistence | In-memory store + IndexedDB auto-save/restore across restarts |
 | Android WebView shell | ✅ Real UI loads | `android:webbuild` → `build/client/index.html` → Capacitor |
 | Preview on Android | ✅ Remote/static preview | Designed fallback supports local static HTML and Remote Runtime live preview status/direct LAN URLs |
-| LLM chat on Android | ❌ Not working | 33 server-side API routes have no server in WebView |
+| LLM chat on Android | ⚠️ Bridge scaffolded | Remix API routes cannot run in WebView; Phase 5.6 adds safe Android API Backend design/client/settings placeholder |
 | Mobile UI | ❌ Not started | Desktop layouts break at 360px (533px min-width, 1200px modal) |
 | APK build | ✅ Automated | `android:apk:debug` compiles the debug APK via Gradle wrapper |
 | Remote Runtime file sync | ✅ MVP complete | Explicit text-file push/pull/single-file sync; IndexedDB remains source of truth |
 | Remote Runtime command profiles | ✅ MVP complete | Safe allowlisted npm/pnpm install/dev/build profiles with WebSocket output, stop, and command status panel |
 | Remote Runtime live preview | ✅ MVP complete | Tracks `npm run dev` / `pnpm run dev` output, returns JSON preview status, and loads detected LAN preview URLs on Android |
+| Android LLM API bridge | ✅ Scaffold complete | Recommends separate authenticated backend; provider keys stay server-side; production chat not connected yet |
 | Device tested | ❌ Not yet | No physical device testing done |
 
 ---
 
 ## Known Limitations
 
-1. **No LLM chat** — The app's core feature (AI chat) requires server-side API routes (`api.chat.ts`, `api.llmcall.ts`, etc.) which don't exist in a WebView. This is the #1 blocker for a usable app.
+1. **LLM chat not wired on Android** — The app's core feature requires server-side API routes (`api.chat.ts`, `api.llmcall.ts`, etc.) which don't exist in a WebView. Phase 5.6 adds a safe Android API Backend design and client scaffold, but production chat still needs a backend implementation and integration.
 
 2. **Live preview fallback** — Dev server preview is unavailable without WebContainer/Remote Runtime. Remote Runtime now tracks dev-server URL output and the Android Preview tab can load a detected LAN URL; local `index.html` static Blob preview remains available.
 
@@ -173,15 +174,17 @@ bolt-diy-android/
 
 7. **Remote Runtime live preview** — Phase 5.5 detects common Vite dev-server URLs from safe dev-command stdout/stderr, exposes `GET /workspace/:id/preview` JSON status, and loads direct network URLs in Android. No preview proxy is implemented yet; projects must bind dev servers to `0.0.0.0` for phone access.
 
-8. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
+8. **Android API Backend required for AI** — Provider keys must stay on a trusted backend. The APK stores only a backend URL/token placeholder and does not bundle provider API keys.
 
-9. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
+9. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
 
-10. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
+10. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
 
-11. **Speech recognition unreliable** — `webkitSpeechRecognition` may not be available in all Android WebView versions.
+11. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
 
-12. **Android build workflow** — The Android build workflow is now fully automated. `npm run android:apk:debug` compiles the debug APK containing the fully functional SPA build.
+12. **Speech recognition unreliable** — `webkitSpeechRecognition` may not be available in all Android WebView versions.
+
+13. **Android build workflow** — The Android build workflow is now fully automated. `npm run android:apk:debug` compiles the debug APK containing the fully functional SPA build.
 
 ---
 
@@ -190,14 +193,15 @@ bolt-diy-android/
 | Component | State | Fix Required |
 |-----------|-------|-------------|
 | `build/client/` | ✅ Complete | Vite SPA build generates real React SPA assets correctly |
-| LLM chat (`api.chat.ts`) | No server in WebView | Phase 5: remote proxy or Capacitor HTTP client |
-| Model listing (`api.models.ts`) | No server in WebView | Phase 5: client-side or proxy |
+| LLM chat (`api.chat.ts`) | Bridge scaffolded | Implement authenticated Android API Backend and wire chat to `AndroidApiClient` |
+| Model listing (`api.models.ts`) | Bridge scaffolded | Implement backend `/models` contract and wire model selectors safely |
 | Preview iframe | ✅ Complete | Designed fallback, local static HTML preview, and Remote Runtime live preview status/direct LAN URL loading implemented |
 | Terminal process | ✅ Complete | Designed fallback and settings redirection implemented |
 | File system persistence | ✅ Complete | InMemoryFS with IndexedDB backing automatically saves and restores files |
 | Remote Runtime file sync | ✅ MVP complete | Text-only push/pull/current-file sync; local IndexedDB wins on conflict |
 | Remote Runtime command profiles | ✅ MVP complete | Allowlisted npm/pnpm profiles only; output streams over WebSocket and command metadata is shown in the terminal panel |
 | Remote Runtime live preview | ✅ MVP complete | Detects Vite-style URLs from dev command output; JSON preview status and Android preview refresh are implemented |
+| Android LLM API bridge | ✅ Scaffold complete | `docs/ANDROID_LLM_API_BRIDGE.md`, `AndroidApiClient`, and Android settings placeholder added; no provider keys in APK |
 | Git operations | FS backend missing | Phase 3: InMemoryFS for isomorphic-git. GitHub Sync panel saves config only |
 | Settings modal | 1200px fixed width | Phase 2: `w-full max-w-[1200px]` |
 | Chat layout | Forces 533px min width | Phase 2: responsive CSS override |
@@ -258,29 +262,30 @@ bolt-diy-android/
 
 1. **Commit `66d0dc0` — "feat: scaffold remote runtime client"**
 2. **Commit `5f8b651` — "feat: scaffold secure remote runtime server"**
-3. **Commit [HEAD] — "feat: connect android settings to remote runtime"**
+3. **Commit `7ba9bc4` — "feat: connect android settings to remote runtime"**
 4. Created `docs/REMOTE_RUNTIME.md` detailing the secure API contract and WS events.
 5. Implemented `RemoteRuntimeClient.ts` with health check, workspace stubs, and single-file write methods.
 6. Connected Settings UI on Android to execute live `/health` status tests and `/workspace` creations.
 7. Workspace ID configuration is successfully persisted and connection state indicators render in UI.
 
-### Phase 6: APK Build & Polish ⚠️ PARTIAL
+### Phase 6: APK Build & Polish ✅ COMPLETE
 
-1. **Commit `b00648c` — "feat: add branding preview and apk build workflow"**
+1. **Commit [HEAD] — "ci: add debug apk artifact workflow"**
 2. Set up automated build scripts (`scripts/build-apk.mjs` with automatic JVM 21/SDK discovery).
-3. Successfully compiled debug APK (`npm run android:apk:debug` generating `app-debug.apk`).
-4. Production release signing config is pending.
+3. Successfully compiled debug APK locally (`npm run android:apk:debug` generating `app-debug.apk`).
+4. Implemented manual trigger (`workflow_dispatch`) GitHub Actions workflow at `.github/workflows/android-debug-apk.yml` to compile and upload `app-debug.apk` as a workflow artifact.
+5. Documented step-by-step GitHub build/download processes and added troubleshooting sections to `README_ANDROID.md` for permissions, SDK paths, Node memory, and missing artifacts.
 
 ---
 
 ## Git State
 
 ```
-[HEAD] feat: connect android settings to remote runtime
+[HEAD] ci: add debug apk artifact workflow
+feat: connect android settings to remote runtime
 5f8b651 feat: scaffold secure remote runtime server
 e94c805 chore: verify remote runtime scaffold
 66d0dc0 feat: scaffold remote runtime client
-6fd6a2e docs: add github repository metadata guide
 ```
 
 **Remote:** `origin → https://github.com/mertgoevse-wq/bolt-diy-android.git`

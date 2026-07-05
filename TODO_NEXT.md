@@ -1,7 +1,7 @@
 # TODO: Next Steps for Android Port
 
-**Last updated:** 2026-07-04
-**Current phase:** Phase 0, 1, 3, 4, 5.3, 5.4, 6 (debug compile) complete; Phase 2 (mobile UI) and Phase 5b (AI provider integration) next.
+**Last updated:** 2026-07-05
+**Current phase:** Phase 0, 1, 3, 4, 5.3, 5.4, 5.5, 5.6, 6 (debug compile & GitHub Actions workflow) complete; Phase 2 (mobile UI) and Android API Backend implementation next.
 
 ---
 
@@ -201,30 +201,54 @@
 
 ---
 
-## Phase 5b: AI Provider Integration
+## Phase 5.6: Android LLM API Bridge Design & Scaffold ✅ DONE
+
+**Goal:** Design and scaffold safe Android LLM chat/code generation without exposing provider keys in the APK.
+
+- [x] Audit `api.chat.ts`, `api.llmcall.ts`, `api.models.ts`, `api.enhancer.ts`
+- [x] Audit provider key handling through cookies, provider settings, Cloudflare env, `process.env`, and `LLMManager`
+- [x] Document architecture options:
+  - [x] Remote Runtime as API proxy
+  - [x] Separate Cloudflare/Vercel API backend
+  - [x] User-supplied local provider endpoints only
+- [x] Recommend separate authenticated API backend as MVP
+- [x] Create `docs/ANDROID_LLM_API_BRIDGE.md`
+- [x] Add `app/lib/android-api/AndroidApiClient.ts`
+- [x] Define client methods:
+  - [x] `listModels()`
+  - [x] `sendChatMessage()`
+  - [x] `streamChatResponse()`
+  - [x] `enhancePrompt()`
+  - [x] `validateProviderConfig()`
+- [x] Add Android settings placeholder:
+  - [x] Android API Backend URL
+  - [x] Backend Auth Token
+  - [x] Test API Backend
+  - [x] Provider keys stay on backend warning
+- [x] Do not connect production chat yet
+- [x] **Commit:** `feat: scaffold android llm api bridge`
+
+---
+
+## Phase 5.7: Android API Backend Implementation
 
 **Goal:** Make LLM chat work without a Remix server.
 
-### Approach A: Remote Proxy (Recommended)
-- [ ] Deploy bolt.diy to Cloudflare Pages (as-is)
-- [ ] In the Android app, point API calls to the deployed URL
-- [ ] Create `app/lib/adapters/api-client.ts` that redirects `fetch('/api/chat')` to `fetch('https://your-app.pages.dev/api/chat')`
-- [ ] This preserves all server-side logic (streaming, prompt construction, etc.)
-
-### Approach B: Client-Side LLM Calls
-- [ ] Create `app/lib/adapters/llm-stream.ts` using `ai` SDK's client-side streaming
-- [ ] Convert `api.chat.ts` logic to run in the browser
-- [ ] Use Capacitor HTTP plugin to bypass CORS restrictions
-- [ ] Risk: API keys exposed in client bundle
-
-### Tasks (Either Approach)
-- [ ] Create `app/lib/adapters/api-client.ts` — intercepts fetch calls to `/api/*`
-- [ ] Update `Chat.client.tsx` to use adapter API client
-- [ ] Update `ModelSelector.tsx` to use adapter for model listing
-- [ ] Update `api.check-env-key.ts` consumer to use adapter
-- [ ] Update `api.configured-providers.ts` consumer to use adapter
+### Recommended Approach
+- [ ] Build/deploy a separate authenticated Android API Backend that reuses server-side LLM logic
+- [ ] Store provider API keys only on the backend, never in Android client JS or APK assets
+- [ ] Implement `GET /health`
+- [ ] Implement `GET /models`
+- [ ] Implement `POST /chat`
+- [ ] Implement `POST /chat/stream`
+- [ ] Implement `POST /enhance`
+- [ ] Implement `POST /provider-config/validate`
+- [ ] Add request size limits, rate limits, streaming timeout, and secret-safe logging
+- [ ] Wire `Chat.client.tsx` to `AndroidApiClient` only when Android API Backend is configured
+- [ ] Wire model selectors to `AndroidApiClient.listModels()` only in Android/API-backend mode
+- [ ] Preserve existing desktop/WebContainer/Remix behavior
 - [ ] Test LLM streaming end-to-end on device
-- [ ] **Commit:** `feat: client-side API adapter for Android`
+- [ ] **Commit:** `feat: connect android chat to api backend`
 
 ---
 
@@ -234,6 +258,7 @@
 
 - [x] Set up automated build scripts (`scripts/build-apk.mjs` with automatic JVM 21/SDK discovery)
 - [x] Successfully compile debug APK (`npm run android:apk:debug` generating `app-debug.apk`)
+- [x] Create GitHub Actions workflow for debug APK artifact (`.github/workflows/android-debug-apk.yml`) triggered manually via `workflow_dispatch`
 - [ ] Create `android/app/src/main/res/xml/network_security_config.xml` for dev cleartext
 - [ ] Configure `android/app/build.gradle`:
   - Set `minSdkVersion` to 24 (Android 7.0 — covers Galaxy A56)

@@ -113,8 +113,8 @@ npm run android:open   # open in Android Studio to run
 
 ## What Works on Android
 
-✅ Chat with AI models (OpenAI, Anthropic, Google, etc.)
-✅ Code generation and display
+⚠️ Chat/code generation UI is present, but Android LLM calls need a configured Android API Backend
+⚠️ Code generation display works after responses exist; provider calls are not wired on Android yet
 ✅ Code editor (CodeMirror)
 ✅ File tree and file management
 ✅ Settings (API keys, provider selection)
@@ -147,7 +147,7 @@ When bolt.diy detects that it's running in an Android WebView (or a browser with
 
 In fallback mode:
 - **File editing** works in the UI (CodeMirror editor is fully functional)
-- **AI chat and code generation** work normally
+- **AI chat and code generation** require a configured Android API Backend; provider keys must stay on that backend
 - **File tree** navigation works (files are kept in memory and persisted via IndexedDB)
 - **Terminal, dev server, preview, and package install** are disabled
 
@@ -175,6 +175,19 @@ The terminal fallback on Android does not accept free-form shell input. When Rem
 Output streams back into the terminal panel over the Remote Runtime WebSocket, and the running command can be stopped from the same panel. The panel also shows the last command profile, command ID, current/final status, last output timestamp, and exit code when available.
 
 When `npm run dev` or `pnpm run dev` prints a Vite-style preview URL, the Preview tab can refresh Remote Runtime preview status and load the detected network URL. The panel also includes **Open External Preview** for launching the URL outside the iframe.
+
+### Android LLM API Backend
+
+The Android WebView cannot run Remix API routes such as `api.chat.ts`, `api.models.ts`, `api.llmcall.ts`, or `api.enhancer.ts` locally. Do not put OpenAI, Anthropic, Google, OpenRouter, or other provider API keys into the Android app bundle.
+
+Phase 5.6 adds a safe design and client scaffold for a separate authenticated Android API Backend. Settings now includes:
+
+- **Android API Backend URL**
+- **Backend Auth Token**
+- **Test API Backend**
+- A clear warning that provider keys stay on the backend
+
+This is not connected to production chat yet. See `docs/ANDROID_LLM_API_BRIDGE.md` for the recommended backend contract and security model.
 
 ### Setting up the Remote Runtime locally
 
@@ -221,8 +234,118 @@ To use the Remote Runtime with your Android device:
 | Package install | ✅ | ❌ | ✅ allowlisted profiles |
 | Dev server | ✅ | ❌ | ✅ allowlisted profiles |
 | Live preview | ✅ | ❌ | ✅ direct LAN URL |
-| AI chat | ✅ | ✅ | ✅ |
-| Code generation | ✅ | ✅ | ✅ |
+| AI chat | ✅ | ❌ needs API backend | ⚠️ scaffolded API bridge |
+| Code generation | ✅ | ❌ needs API backend | ⚠️ scaffolded API bridge |
+
+See `PORTING_REPORT.md` for the full technical analysis and `src/mobile/adapters/runtime/` for the adapter abstraction layer.
+## GitHub Sync
+
+### Connecting Your GitHub Account
+
+1. Open **Settings → GitHub** in the app
+2. Choose token type:
+   - **Personal Access Token (Classic)** — simplest, works for most users
+   - **Fine-grained Token** — more granular permissions
+3. Go to [github.com/settings/tokens](https://github.com/settings/tokens) to create a token
+4. Required scopes for classic tokens: `repo`, `read:org`, `read:user`
+5. Paste the token and tap **Connect**
+6. You should see your GitHub profile and repositories
+
+Alternatively, set the `VITE_GITHUB_ACCESS_TOKEN` environment variable in `.env.local` before building the app.
+
+### GitHub Sync Panel
+
+Once connected, scroll down in the GitHub settings tab to find the **GitHub Sync** panel. This panel lets you:
+
+- **Configure your repository URL** (e.g. `https://github.com/your-username/your-repo`)
+- **Set the branch name** (default: `main`)
+- **View sync status** (last sync time, uncommitted file count, error messages)
+
+### Commit & Push — Current Limitations
+
+The **Commit Changes** and **Push to GitHub** buttons are currently **disabled** on Android. Here's why:
+
+| Action | WebContainer (Desktop) | Android Fallback | Remote Runtime (Future) |
+|--------|:---:|:---:|:---:|
+| Commit | ✅ via isomorphic-git | ❌ no git runtime | ✅ via remote |
+| Push | ✅ via isomorphic-git | ❌ no git runtime | ✅ via remote |
+
+Git operations (commit, push) require a runtime that can execute `git` commands. On Android Fallback Mode, there is no local runtime — only in-memory file editing. The buttons show a clear explanation when disabled.
+
+### What You Can Do Now
+
+Even without commit/push on mobile, you can:
+- ✅ Connect your GitHub account and browse repositories
+- ✅ Configure which repo and branch you're working on
+- ✅ Edit code files in the editor
+- ✅ Generate code with AI
+- ✅ Export your project as a ZIP (Settings → Data Management)
+- ✅ Sync to your computer and commit from there
+
+### Syncing to Desktop for Commit/Push
+
+1. Edit files on your Android device
+2. Export the project as a ZIP (Settings → Data Management → Export)
+3. Transfer the ZIP to your computer
+4. Unzip into your local git repository
+5. Commit and push from your computer:
+
+```bash
+cd your-repo
+git add .
+git commit -m "Changes from Android"
+git push origin main
+```
+
+### Troubleshooting GitHub Auth/Token Issues
+
+**"Authentication failed: 401 Unauthorized"**
+- Your token may have expired. Generate a new one at github.com/settings/tokens
+- Make sure you selected the right token type (classic vs fine-grained)
+- For classic tokens, ensure the `repo` scope is checked
+
+**"Authentication failed: 403 Forbidden"**
+- Your token doesn't have sufficient permissions
+- For fine-grained tokens, make sure repository access includes the repos you need
+- Check if your organization requires SSO — you may need to authorize the token
+
+**"Could not resolve host" / Network errors**
+- Make sure your device has internet connectivity
+- GitHub API calls go to `api.github.com` — ensure it's not blocked
+- If behind a proxy, Capacitor WebView may need additional configuration
+
+**Token works on desktop but not on Android**
+- The token is stored in a cookie + localStorage. If the WebView clears storage on restart, you'll need to reconnect
+- Make sure `Cookies.set('githubToken', ...)` is not blocked by WebView settings
+- Check `capacitor.config.ts` for any storage restrictions
+
+**Fine-grained token issues**
+- Fine-grained tokens are newer and may have different permission requirements
+- Ensure "Repository access" includes the specific repos or "All repositories"
+- Organization access may need explicit approval from org admins
+
+**Connection lost after app restart**
+- The app saves your connection to localStorage. If the WebView clears storage, reconnection is needed
+- Setting `VITE_GITHUB_ACCESS_TOKEN` in `.env.local` provides automatic connection at build time
+- This is the most reliable method for Android — the token is baked into the app
+
+### TODO: Real GitHub API Integration
+
+The GitHub Sync panel currently saves configuration only. Real git operations (commit, push) via the GitHub REST API or a remote runtime server are not yet implemented. The roadmap:
+
+1. **Remote Runtime backend** — a server-side sandbox that can run git commands
+2. **GitHubSyncAdapter** — implements commit/push using the GitHub REST API (`/repos/{owner}/{repo}/git/trees`, `/git/commits`, `/git/refs`) directly, without needing a local git runtime
+3. **WebSocket sync** — real-time file sync between the app and the remote repository
+
+
+## Configuration
+
+### Environment Variables
+
+Copy `.env.example` to `.env.local` and add your API keys:
+
+```bash
+cp .env.example .env.local
 
 See `PORTING_REPORT.md` for the full technical analysis and `src/mobile/adapters/runtime/` for the adapter abstraction layer.
 ## GitHub Sync
@@ -346,7 +469,56 @@ appId: 'com.mertgoevse.boltdiyandroid',  // your package name
 appName: 'bolt.diy Android',        // display name
 ```
 
+## How to Build APK from GitHub
+
+You can build and download the Android debug APK directly from GitHub Actions without needing to set up a local Android development environment or Android Studio.
+
+### Steps to Build and Download:
+1. Navigate to your repository on GitHub: `https://github.com/mertgoevse-wq/bolt-diy-android`.
+2. Click on the **Actions** tab at the top.
+3. In the left sidebar, select the **Android Debug APK** workflow.
+4. Click the **Run workflow** dropdown menu on the right.
+5. Keep the branch as `main` (or select the branch you want to build) and click the green **Run workflow** button.
+6. Once the workflow run completes successfully (takes around 2-3 minutes), click on the completed run.
+7. Scroll down to the **Artifacts** section at the bottom.
+8. Click on **bolt-diy-android-debug-apk** to download the zip file containing the compiled `app-debug.apk`.
+
+### How to Install on Your Device:
+1. Extract the downloaded `bolt-diy-android-debug-apk.zip` file to get the `app-debug.apk`.
+2. Transfer the APK file to your phone (via USB, email, cloud storage, or a file-sharing app).
+3. Open the file manager on your phone and tap the APK to install it.
+4. **Android Unknown-Source Warning**:
+   - Because the APK is built manually and not downloaded from the Google Play Store, Android will display a warning: "Blocked by Play Protect" or "For your security, your phone is not allowed to install unknown apps from this source."
+   - To proceed, tap **Settings** in the dialog (or go to Settings -> Apps -> Special app access -> Install unknown apps -> select your browser/file manager) and toggle on **Allow from this source**.
+   - If Play Protect warns you that the app is unrecognized, tap **Install anyway** or **More details -> Install anyway**. This warning is normal for development builds.
+
 ## Troubleshooting
+
+**Gradle Permission Issue (Linux/macOS)**
+- **Problem:** When building locally, you see `./gradlew: Permission denied`.
+- **Solution:** Grant execution permission to the Gradle wrapper by running:
+  ```bash
+  chmod +x android/gradlew
+  ```
+
+**Android SDK / Environment Issues**
+- **Problem:** Build fails with `SDK location not found` or gradle cannot find the Android SDK.
+- **Solution:**
+  - Create or edit the `android/local.properties` file and verify the `sdk.dir` path is correct (e.g., `sdk.dir=/Users/username/Library/Android/sdk` on macOS or `sdk.dir=C\:\\Users\\username\\AppData\\Local\\Android\\Sdk` on Windows).
+  - Ensure the `ANDROID_HOME` or `ANDROID_SDK_ROOT` environment variable is defined in your terminal profile.
+
+**Node / Vite Memory Issues**
+- **Problem:** Build runs out of memory (`JavaScript heap out of memory`) during `npm run android:webbuild` or `npm run typecheck`.
+- **Solution:** Increase the Node heap limit before running the build:
+  - On macOS/Linux: `export NODE_OPTIONS="--max-old-space-size=4096"`
+  - On Windows (PowerShell): `$env:NODE_OPTIONS="--max-old-space-size=4096"`
+  - On Windows (Command Prompt): `set NODE_OPTIONS=--max-old-space-size=4096`
+
+**Artifact Not Found**
+- **Problem:** The GitHub Actions workflow completes, but there is no build artifact to download under the run.
+- **Solution:**
+  - Check the workflow execution logs. Ensure the Gradle build step didn't fail silently.
+  - Verify that the output APK was actually generated at `android/app/build/outputs/apk/debug/app-debug.apk`. If not, check Gradle compilation errors.
 
 **"WebContainer is not available" message**
 This is expected on Android. The app falls back to a chat-only mode. See above.
@@ -360,9 +532,10 @@ This is expected on Android. The app falls back to a chat-only mode. See above.
 - Run `npm run android:sync` to make sure web assets are up to date
 - Check Logcat in Android Studio for JavaScript console errors
 
-**API key not working**
-- Make sure `.env.local` is set up with valid keys
-- Keys are embedded at build time — rebuild after changing them
+**LLM provider keys on Android**
+- Do not embed provider API keys in the Android app.
+- Configure provider keys only on the Android API Backend or another trusted server.
+- The Android settings token is for authenticating to your backend, not for direct provider access.
 
 ## Architecture
 
