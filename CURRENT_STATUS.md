@@ -178,7 +178,7 @@ bolt-diy-android/
 
 9. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
 
-10. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
+10. **Git operations via Remote Runtime** — Client UI is fully wired to the Remote Runtime Git API. Users can initialize a Git repository, check git status, and commit changes on the remote workspace. Pushing to GitHub is supported in dry-run/simulation mode for credential safety.
 
 11. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
 
@@ -202,7 +202,7 @@ bolt-diy-android/
 | Remote Runtime command profiles | ✅ MVP complete | Allowlisted npm/pnpm profiles only; output streams over WebSocket and command metadata is shown in the terminal panel |
 | Remote Runtime live preview | ✅ MVP complete | Detects Vite-style URLs from dev command output; JSON preview status and Android preview refresh are implemented |
 | Android LLM API bridge | ✅ Scaffold complete | `docs/ANDROID_LLM_API_BRIDGE.md`, `AndroidApiClient`, and Android settings placeholder added; no provider keys in APK |
-| Git operations | FS backend missing | Phase 3: InMemoryFS for isomorphic-git. GitHub Sync panel saves config only |
+| Git operations | ✅ MVP complete | Phase 5.7: Remote Git API server scaffolding and UI client integration complete. Push operations are dry-run only. |
 | Settings modal | 1200px fixed width | Phase 2: `w-full max-w-[1200px]` |
 | Chat layout | Forces 533px min width | Phase 2: responsive CSS override |
 | DnD (file tree, chat) | HTML5 backend, no touch | Phase 2: switch to `react-dnd-touch-backend` |
@@ -268,13 +268,14 @@ bolt-diy-android/
 6. Connected Settings UI on Android to execute live `/health` status tests and `/workspace` creations.
 7. Workspace ID configuration is successfully persisted and connection state indicators render in UI.
 
-### Phase 5.7: Remote Runtime Git Workflow Scaffold ✅ COMPLETE
+### Phase 5.7: Remote Runtime Git Workflow Wiring & Integration ✅ COMPLETE
 
-1. **Commit [HEAD] — "feat: scaffold remote git workflow"**
+1. **Commit [HEAD] — "feat: complete remote git workflow wiring"**
 2. Created `docs/REMOTE_GIT_WORKFLOW.md` detailing the secure Git API specifications.
 3. Implemented safe Git command execution engine using `execFile` (shell-less) in `remote-runtime/src/git.ts`.
 4. Exposed endpoints `/workspace/:id/git/status`, `/git/init`, `/git/commit`, `/git/push` with authentication and workspace validation in `remote-runtime/src/server.ts`.
-5. Updated client settings UI `GitHubSyncPanel.tsx` to require a Remote Runtime and show future workflow hints.
+5. Exposed helper methods (`gitStatus`, `gitInit`, `gitCommit`, `gitPush`) in `RemoteRuntimeClient.ts`.
+6. Wired action buttons (Git Init, Git Status, Commit, Push Dry-Run) and terminal logs box in client settings UI `GitHubSyncPanel.tsx`.
 
 ### Phase 6: APK Build & Polish ✅ COMPLETE
 
@@ -289,7 +290,7 @@ bolt-diy-android/
 ## Git State
 
 ```
-[HEAD] feat: scaffold remote git workflow
+[HEAD] feat: complete remote git workflow wiring
 ad1ffa6 ci: add debug apk artifact workflow
 feat: connect android settings to remote runtime
 5f8b651 feat: scaffold secure remote runtime server

@@ -365,32 +365,35 @@ Alternatively, set the `VITE_GITHUB_ACCESS_TOKEN` environment variable in `.env.
 
 ### GitHub Sync Panel
 
-Once connected, scroll down in the GitHub settings tab to find the **GitHub Sync** panel. This panel lets you:
+Once connected, scroll down in the GitHub settings tab to find the **GitHub Sync** panel. This panel lets you perform version control directly from your Android device using the connected **Remote Runtime**:
 
 - **Configure your repository URL** (e.g. `https://github.com/your-username/your-repo`)
 - **Set the branch name** (default: `main`)
-- **View sync status** (last sync time, uncommitted file count, error messages)
+- **Initialize Git Repository** (`git init` executed on the Remote Runtime server)
+- **Check Git Status** (`git status` executed on the Remote Runtime server)
+- **Commit Changes** (`git commit` executed on the Remote Runtime server)
+- **Simulate Push** (`git push` simulated on the Remote Runtime server in dry-run mode for credential safety)
 
-### Commit & Push — Current Limitations
+### Commit & Push — Operation Summary
 
-The **Commit Changes** and **Push to GitHub** buttons are currently **disabled** on Android. Here's why:
+Git status, init, and commit operations execute securely on the Remote Runtime server. Pushing is restricted to dry-run mode for safety:
 
-| Action | WebContainer (Desktop) | Android Fallback | Remote Runtime (Future) |
-|--------|:---:|:---:|:---:|
-| Commit | ✅ via isomorphic-git | ❌ no git runtime | ✅ via remote |
-| Push | ✅ via isomorphic-git | ❌ no git runtime | ✅ via remote |
+| Action | WebContainer (Desktop) | Remote Runtime (Mobile) |
+|--------|:---:|:---:|
+| Git Init | ✅ via isomorphic-git | ✅ via Remote Git API |
+| Git Status | ✅ via isomorphic-git | ✅ via Remote Git API |
+| Git Commit | ✅ via isomorphic-git | ✅ via Remote Git API |
+| Git Push | ✅ via isomorphic-git | ⚠️ Simulated (Dry-run only) |
 
-Git operations (commit, push) require a runtime that can execute `git` commands. On Android Fallback Mode, there is no local runtime — only in-memory file editing. The buttons show a clear explanation when disabled.
+Git operations are disabled on the device if the **Remote Runtime** is not configured or offline.
 
 ### What You Can Do Now
 
-Even without commit/push on mobile, you can:
-- ✅ Connect your GitHub account and browse repositories
 - ✅ Configure which repo and branch you're working on
-- ✅ Edit code files in the editor
-- ✅ Generate code with AI
+- ✅ Initialize Git and track status via Remote Runtime
+- ✅ Commit code changes via Remote Runtime
+- ✅ Simulate pushing via Remote Runtime
 - ✅ Export your project as a ZIP (Settings → Data Management)
-- ✅ Sync to your computer and commit from there
 
 ### Syncing to Desktop for Commit/Push
 

@@ -411,32 +411,23 @@ No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing
 | UI layout (mobile) | ⚠️ | Basic tab nav works; full Phase 2 responsive pass pending |
 | APK compilation | ✅ | Fully automated debug build command & manual GitHub Actions workflow integrated |
 | APK release signing | ❌ | Release signing configure still pending for production builds |
+| Git sync | ✅ | Remote Git client wired (status, init, commit active; push is dry-run only) |
 
 ---
 
 ## Commit History
 
 ```
-ci: add debug apk artifact workflow              ← this commit
+feat: complete remote git workflow wiring        ← this commit
+ad1ffa6 ci: add debug apk artifact workflow
 feat: connect android settings to remote runtime
 5f8b651 feat: scaffold secure remote runtime server
 e94c805 chore: verify remote runtime scaffold
 66d0dc0 feat: scaffold remote runtime client
 6fd6a2e docs: add github repository metadata guide
-feat: add branding preview and apk build workflow
-feat: polish android terminal and preview fallback
-feat: add reliable android webview shell
-feat: add android-specific entry point and build validation
-chore: verify android persistence integration
-feat(android): add fallback storage and update runtime, adapter, and stores
-chore: finalize android branding verification
-chore: rebrand as bolt-diy-android
-feat: add mobile github sync panel
-feat: add android runtime fallback mode
-feat: add runtime adapter layer
 ```
 
 ---
 
 **Verification completed**: 2026-07-05  
-**Status**: ✅ PASS — Android debug APK build workflow implemented and locally verified.
+**Status**: ✅ PASS — Remote Git client API wired, front-end sync actions integrated, and Android debug APK successfully compiled.

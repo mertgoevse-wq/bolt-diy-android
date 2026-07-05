@@ -30,6 +30,8 @@ import { classNames } from '~/utils/classNames';
 import { githubSyncStore, setSyncRepoUrl, setSyncBranch, isRepoConfigured } from '~/lib/stores/github-sync';
 import { runtimeModeStore } from '~/lib/stores/runtime-mode';
 import { useStore as useNanostore } from '@nanostores/react';
+import { RemoteRuntimeClient } from '~/lib/remote-runtime/RemoteRuntimeClient';
+import { githubConnectionStore } from '~/lib/stores/githubConnection';
 
 // GitHub logo
 const GithubLogo = ({ className }: { className?: string }) => (
@@ -62,10 +64,17 @@ export function GitHubSyncPanel() {
     toast.success('GitHub sync configuration saved');
   }, [urlInput, branchInput]);
 
+  const [commitMessage, setCommitMessage] = useState('');
+  const [gitOutput, setGitOutput] = useState('');
+  const [gitError, setGitError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
   // Check if runtime supports git operations
-  const gitAvailable = runtime.capabilities.commandExecution && runtime.capabilities.terminal;
   const isRemoteMode = runtime.mode === 'remote';
-  const isWebContainerMode = runtime.mode === 'webcontainer' && runtime.webContainerAvailable;
+  const isRemoteUrlConfigured = !!runtime.remoteRuntimeUrl;
+  const isWorkspaceConfigured = !!runtime.remoteWorkspaceId;
+
+  const isGitActionDisabled = !isRepoConfigured() || !isRemoteMode || !isRemoteUrlConfigured || !isWorkspaceConfigured;
 
   // Explanation for disabled buttons
   const disabledReason = !isRepoConfigured()
@@ -74,14 +83,148 @@ export function GitHubSyncPanel() {
       ? 'Remote Runtime required: Git operations require a connected Remote Runtime. To configure, go to Settings → Runtime Mode.'
       : !runtime.remoteRuntimeUrl
         ? 'Set a Remote Runtime URL in Settings → Runtime Mode first'
-        : 'Future workflow: Commits and pushes will execute secure allowlisted git commands on the Remote Runtime server. Integrations will connect to these endpoints in the next phase.';
+        : !isWorkspaceConfigured
+          ? 'Workspace ID is not set. Initialize a workspace in Settings → Runtime Mode first.'
+          : '';
 
-  const isCommitDisabled =
-    !isRepoConfigured() ||
-    !isRemoteMode ||
-    !runtime.remoteRuntimeUrl ||
-    true; // always disabled in client UI until endpoint integrations are connected in client-side stores
-  const isPushDisabled = isCommitDisabled;
+  const handleGitInit = useCallback(async () => {
+    if (isGitActionDisabled) {
+      return;
+    }
+
+    setIsLoading(true);
+    setGitOutput('');
+    setGitError('');
+
+    try {
+      const client = new RemoteRuntimeClient(
+        runtime.remoteRuntimeUrl,
+        runtime.remoteAuthToken,
+        runtime.remoteWorkspaceId
+      );
+
+      const res = await client.gitInit();
+      if (res.ok) {
+        setGitOutput(res.output || 'Git repository initialized successfully.');
+        toast.success('Git repository initialized.');
+      } else {
+        setGitError(res.error || 'Failed to initialize Git repository.');
+        toast.error('Git init failed.');
+      }
+    } catch (err: any) {
+      setGitError(err.message || 'Unknown network error during Git init.');
+      toast.error('Network error during Git init.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isGitActionDisabled, runtime]);
+
+  const handleGitStatus = useCallback(async () => {
+    if (isGitActionDisabled) {
+      return;
+    }
+
+    setIsLoading(true);
+    setGitOutput('');
+    setGitError('');
+
+    try {
+      const client = new RemoteRuntimeClient(
+        runtime.remoteRuntimeUrl,
+        runtime.remoteAuthToken,
+        runtime.remoteWorkspaceId
+      );
+
+      const res = await client.gitStatus();
+      if (res.ok) {
+        setGitOutput(res.status || 'git status output was empty.');
+        toast.success('Git status checked.');
+      } else {
+        setGitError(res.error || 'Failed to retrieve Git status.');
+        toast.error('Git status failed.');
+      }
+    } catch (err: any) {
+      setGitError(err.message || 'Unknown network error during Git status.');
+      toast.error('Network error during Git status.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isGitActionDisabled, runtime]);
+
+  const handleGitCommit = useCallback(async () => {
+    if (isGitActionDisabled || !commitMessage.trim()) {
+      return;
+    }
+
+    setIsLoading(true);
+    setGitOutput('');
+    setGitError('');
+
+    try {
+      const client = new RemoteRuntimeClient(
+        runtime.remoteRuntimeUrl,
+        runtime.remoteAuthToken,
+        runtime.remoteWorkspaceId
+      );
+
+      const res = await client.gitCommit(commitMessage.trim());
+      if (res.ok) {
+        setGitOutput(res.output || 'Changes committed successfully.');
+        toast.success('Changes committed.');
+        setCommitMessage('');
+      } else {
+        setGitError(res.error || 'Failed to commit changes.');
+        toast.error('Git commit failed.');
+      }
+    } catch (err: any) {
+      setGitError(err.message || 'Unknown network error during Git commit.');
+      toast.error('Network error during Git commit.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isGitActionDisabled, commitMessage, runtime]);
+
+  const handleGitPush = useCallback(async () => {
+    if (isGitActionDisabled) {
+      return;
+    }
+
+    const token = githubConnectionStore.get().token;
+    if (!token) {
+      toast.error('GitHub token is required to push. Please connect your GitHub account in Settings → GitHub.');
+      return;
+    }
+
+    setIsLoading(true);
+    setGitOutput('');
+    setGitError('');
+
+    try {
+      const client = new RemoteRuntimeClient(
+        runtime.remoteRuntimeUrl,
+        runtime.remoteAuthToken,
+        runtime.remoteWorkspaceId
+      );
+
+      const res = await client.gitPush({
+        token,
+        repoUrl: sync.repoUrl,
+      });
+
+      if (res.ok) {
+        setGitOutput(res.output || 'Push completed (simulation).');
+        toast.success('Git push simulated (dry-run).');
+      } else {
+        setGitError(res.error || 'Failed to execute simulated push.');
+        toast.error('Git push simulated check failed.');
+      }
+    } catch (err: any) {
+      setGitError(err.message || 'Unknown network error during Git push.');
+      toast.error('Network error during Git push.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isGitActionDisabled, sync.repoUrl, runtime]);
 
   const formatTimestamp = (iso: string | null): string => {
     if (!iso) {
@@ -248,59 +391,144 @@ export function GitHubSyncPanel() {
         )}
       </motion.div>
 
-      {/* Actions */}
+      {/* Git Operations */}
       <motion.div
-        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-3', 'bg-white dark:bg-[#0A0A0A]')}
+        className={classNames('rounded-lg shadow-sm dark:shadow-none p-4 space-y-4', 'bg-white dark:bg-[#0A0A0A]')}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <div className="flex items-center gap-2">
-          <div className="i-ph:arrows-clockwise-fill w-4 h-4 text-purple-500" />
-          <span className="text-sm font-medium text-bolt-elements-textPrimary">Actions</span>
-        </div>
-
-        {/* Commit button */}
-        <div>
-          <button
-            disabled={isCommitDisabled}
-            className={classNames(
-              'w-full px-4 py-2.5 rounded-lg text-sm font-medium',
-              'flex items-center justify-center gap-2',
-              'transition-all duration-200',
-              isCommitDisabled
-                ? 'bg-gray-100 dark:bg-[#1A1A1A] text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                : 'bg-[#303030] text-white hover:bg-[#5E41D0] transform active:scale-95',
-            )}
-          >
-            <div className="i-ph:git-commit-fill w-4 h-4" />
-            Commit Changes
-          </button>
-          {isCommitDisabled && (
-            <p className="text-xs text-bolt-elements-textSecondary mt-1.5 leading-relaxed">{disabledReason}</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="i-ph:git-branch-fill w-4 h-4 text-purple-500" />
+            <span className="text-sm font-medium text-bolt-elements-textPrimary">Git Operations</span>
+          </div>
+          {isRemoteMode && isRemoteUrlConfigured && isWorkspaceConfigured && (
+            <span className="text-[10px] bg-green-500/10 border border-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-semibold">
+              Remote Runtime Connected
+            </span>
           )}
         </div>
 
-        {/* Push button */}
-        <div>
+        {/* Basic Git Ops Row (Init & Status) */}
+        <div className="grid grid-cols-2 gap-2">
           <button
-            disabled={isPushDisabled}
+            onClick={handleGitInit}
+            disabled={isGitActionDisabled || isLoading}
             className={classNames(
-              'w-full px-4 py-2.5 rounded-lg text-sm font-medium',
-              'flex items-center justify-center gap-2',
-              'transition-all duration-200',
-              isPushDisabled
-                ? 'bg-gray-100 dark:bg-[#1A1A1A] text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                : 'bg-[#303030] text-white hover:bg-[#5E41D0] transform active:scale-95',
+              'px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border border-bolt-elements-borderColor transition-all duration-200',
+              isGitActionDisabled || isLoading
+                ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-[#1A1A1A] text-gray-400 dark:text-gray-600'
+                : 'bg-bolt-elements-background-depth-1 text-bolt-elements-textPrimary hover:bg-bolt-elements-background-depth-2 active:scale-95'
             )}
           >
-            <div className="i-ph:upload-simple-fill w-4 h-4" />
-            Push to GitHub
+            <div className={isLoading ? 'i-ph:spinner-gap animate-spin w-3.5 h-3.5' : 'i-ph:folder-plus-fill w-3.5 h-3.5'} />
+            Git Init
           </button>
-          {isPushDisabled && (
-            <p className="text-xs text-bolt-elements-textSecondary mt-1.5 leading-relaxed">{disabledReason}</p>
-          )}
+
+          <button
+            onClick={handleGitStatus}
+            disabled={isGitActionDisabled || isLoading}
+            className={classNames(
+              'px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border border-bolt-elements-borderColor transition-all duration-200',
+              isGitActionDisabled || isLoading
+                ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-[#1A1A1A] text-gray-400 dark:text-gray-600'
+                : 'bg-bolt-elements-background-depth-1 text-bolt-elements-textPrimary hover:bg-bolt-elements-background-depth-2 active:scale-95'
+            )}
+          >
+            <div className={isLoading ? 'i-ph:spinner-gap animate-spin w-3.5 h-3.5' : 'i-ph:git-diff-fill w-3.5 h-3.5'} />
+            Git Status
+          </button>
         </div>
+
+        {/* Commit message input */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs text-bolt-elements-textSecondary">Commit Message</label>
+          <input
+            type="text"
+            value={commitMessage}
+            onChange={(e) => setCommitMessage(e.target.value)}
+            disabled={isGitActionDisabled || isLoading}
+            placeholder="feat: build remote git workflow..."
+            className={classNames(
+              'w-full px-3 py-2 rounded-lg text-xs',
+              'bg-[#FAFAFA] dark:bg-[#0A0A0A]',
+              'border border-[#E5E5E5] dark:border-[#1A1A1A]',
+              'text-bolt-elements-textPrimary',
+              'focus:outline-none focus:ring-1 focus:ring-purple-500',
+              'transition-all duration-200',
+              'placeholder:text-bolt-elements-textTertiary',
+              (isGitActionDisabled || isLoading) && 'opacity-50 cursor-not-allowed'
+            )}
+          />
+        </div>
+
+        {/* Commit action button */}
+        <button
+          onClick={handleGitCommit}
+          disabled={isGitActionDisabled || isLoading || !commitMessage.trim()}
+          className={classNames(
+            'w-full px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200',
+            (isGitActionDisabled || isLoading || !commitMessage.trim())
+              ? 'bg-gray-100 dark:bg-[#1A1A1A] text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              : 'bg-purple-600 hover:bg-purple-700 text-white transform active:scale-95'
+          )}
+        >
+          <div className={isLoading ? 'i-ph:spinner-gap animate-spin w-4 h-4' : 'i-ph:git-commit-fill w-4 h-4'} />
+          Commit Changes
+        </button>
+
+        {/* Push action button (Dry-run simulated) */}
+        <div>
+          <button
+            onClick={handleGitPush}
+            disabled={isGitActionDisabled || isLoading}
+            className={classNames(
+              'w-full px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200',
+              (isGitActionDisabled || isLoading)
+                ? 'bg-gray-100 dark:bg-[#1A1A1A] text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white transform active:scale-95'
+            )}
+          >
+            <div className={isLoading ? 'i-ph:spinner-gap animate-spin w-4 h-4' : 'i-ph:cloud-arrow-up-fill w-4 h-4'} />
+            Push to GitHub (Dry-Run)
+          </button>
+          <p className="text-[10px] text-amber-500 mt-1.5 flex items-center gap-1 leading-normal">
+            <span className="i-ph:info-fill flex-shrink-0" />
+            <span>Push is simulated in dry-run mode for credential safety.</span>
+          </p>
+        </div>
+
+        {/* Disabled hint warning */}
+        {isGitActionDisabled && (
+          <p className="text-xs text-red-500 bg-red-950/10 border border-red-900/20 rounded-lg p-2.5 leading-relaxed">
+            <strong>Runtime Needed:</strong> {disabledReason}
+          </p>
+        )}
+
+        {/* Git console logs output */}
+        {(gitOutput || gitError) && (
+          <div className="flex flex-col gap-1.5 border border-[#E5E5E5] dark:border-[#1A1A1A] rounded-lg p-3 bg-black/40 font-mono text-[10px] leading-relaxed break-all">
+            <div className="flex items-center justify-between text-bolt-elements-textSecondary border-b border-bolt-elements-borderColor/30 pb-1 mb-1.5">
+              <span>Git Console Output</span>
+              <button
+                onClick={() => {
+                  setGitOutput('');
+                  setGitError('');
+                }}
+                className="hover:text-bolt-elements-textPrimary transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+            {gitOutput && (
+              <pre className="text-green-400 whitespace-pre-wrap">{gitOutput}</pre>
+            )}
+            {gitError && (
+              <pre className="text-red-400 whitespace-pre-wrap"><strong>Error:</strong> {gitError}</pre>
+            )}
+          </div>
+        )}
       </motion.div>
 
       {/* Token connection hint */}

@@ -100,6 +100,12 @@ All endpoints require authorization via the `REMOTE_RUNTIME_TOKEN` and a valid `
 
 ---
 
+## Implementation Status
+- **Server API:** Fully integrated (`remote-runtime/src/server.ts`).
+- **Client SDK:** RemoteRuntimeClient exposed (`gitStatus`, `gitInit`, `gitCommit`, `gitPush` helpers).
+- **Client UI:** Mobile sync page wired with active operations console (`app/components/mobile/GitHubSyncPanel.tsx`).
+- **Push Mode:** Simulated (dry-run) on server and clearly indicated as "dry-run only" in the client UI.
+
 ## Future Enhancements
 - Safe integration of temporary credential helpers to support actual remote push operations without persisting tokens on disk.
 - Partial staging (git add on specific file lists).

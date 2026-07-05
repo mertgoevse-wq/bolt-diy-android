@@ -332,4 +332,88 @@ export class RemoteRuntimeClient {
   connectEvents(onMessage: (event: RemoteRuntimeEvent) => void): WebSocket {
     return this.connectWebSocket(onMessage);
   }
+
+  /**
+   * Safe Git Status: GET /workspace/:id/git/status
+   */
+  async gitStatus(): Promise<{ ok: boolean; status?: string; error?: string }> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    return this.request<{ ok: boolean; status?: string; error?: string }>(
+      `/workspace/${this.workspaceId}/git/status`,
+      { method: 'GET' }
+    );
+  }
+
+  /**
+   * Safe Git Init: POST /workspace/:id/git/init
+   */
+  async gitInit(): Promise<{ ok: boolean; output?: string; error?: string }> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    return this.request<{ ok: boolean; output?: string; error?: string }>(
+      `/workspace/${this.workspaceId}/git/init`,
+      { method: 'POST' }
+    );
+  }
+
+  /**
+   * Safe Git Commit: POST /workspace/:id/git/commit
+   */
+  async gitCommit(message: string): Promise<{ ok: boolean; output?: string; error?: string }> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    if (!message || !message.trim()) {
+      throw new Error('Commit message is required.');
+    }
+
+    return this.request<{ ok: boolean; output?: string; error?: string }>(
+      `/workspace/${this.workspaceId}/git/commit`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      }
+    );
+  }
+
+  /**
+   * Safe Git Push: POST /workspace/:id/git/push
+   */
+  async gitPush(options: { token: string; repoUrl: string }): Promise<{ ok: boolean; output?: string; error?: string }> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    const { token, repoUrl } = options;
+
+    if (!token || !token.trim()) {
+      throw new Error('GitHub token is required.');
+    }
+
+    if (!repoUrl || !repoUrl.trim()) {
+      throw new Error('Remote repository URL is required.');
+    }
+
+    try {
+      return await this.request<{ ok: boolean; output?: string; error?: string }>(
+        `/workspace/${this.workspaceId}/git/push`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ token, repoUrl }),
+        }
+      );
+    } catch (error: any) {
+      let message = error.message || 'Git push request failed.';
+      if (token) {
+        message = message.replace(token, '[TOKEN_REDACTED]');
+      }
+      throw new Error(message);
+    }
+  }
 }
