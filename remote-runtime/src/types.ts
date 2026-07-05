@@ -33,13 +33,30 @@ export interface SyncFilesResponse {
 }
 
 export interface CommandRunRequest {
-  command: string;
-  args?: string[];
+  commandProfile: CommandProfile;
 }
 
 export interface CommandRunResponse {
   commandId: string;
+  commandProfile: CommandProfile;
+  workspaceId: string;
+  status: CommandStatus;
+  startedAt: string;
+  endedAt?: string;
+  exitCode?: number | null;
+  signal?: string | null;
+  error?: string;
 }
+
+export type CommandProfile =
+  | 'npm install'
+  | 'npm run dev'
+  | 'npm run build'
+  | 'pnpm install'
+  | 'pnpm run dev'
+  | 'pnpm run build';
+
+export type CommandStatus = 'running' | 'exited' | 'stopped' | 'error' | 'timed-out';
 
 export interface EventMessage {
   type: 'status' | 'stdout' | 'stderr' | 'exit';

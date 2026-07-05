@@ -158,9 +158,20 @@ Open Settings → **Runtime Mode** to see the current runtime status and configu
 |------|-------------|
 | **WebContainer Browser Mode** | Full in-browser runtime. Only available on desktop browsers with SharedArrayBuffer + cross-origin isolation. Greyed out on Android. |
 | **Android Fallback Mode** | In-memory file system. Code editing and AI chat work. No terminal, dev server, or preview. This is the default on Android. |
-| **Remote Runtime** | Connect to a remote sandbox server for explicit text-file sync. File editing stays local and IndexedDB remains the source of truth. Command execution is still disabled in the MVP. |
+| **Remote Runtime** | Connect to a remote sandbox server for explicit text-file sync and safe allowlisted project commands. File editing stays local and IndexedDB remains the source of truth. |
 
 The settings card lets you save the **Remote Runtime URL**, **Auth Token**, and **Workspace ID**. You can click **Test Connection** to check if the server is healthy, **Create Workspace** to generate a sandboxed folder, **Sync workspace to Remote Runtime** to push all local text files, **Pull remote files** to import missing remote text files after user action, or **Sync current file** to push the open editor file.
+
+The terminal fallback on Android does not accept free-form shell input. When Remote Runtime is configured, it shows buttons for safe predefined command profiles only:
+
+- `npm install`
+- `npm run dev`
+- `npm run build`
+- `pnpm install`
+- `pnpm run dev`
+- `pnpm run build`
+
+Output streams back into the terminal panel over the Remote Runtime WebSocket, and the running command can be stopped from the same panel.
 
 ### Setting up the Remote Runtime locally
 
@@ -197,9 +208,9 @@ To use the Remote Runtime with your Android device:
 |---------|:---:|:---:|:---:|
 | File editing | ✅ real | ✅ in-memory | ✅ local |
 | Terminal | ✅ | ❌ stub | ✅ remote |
-| Command execution | ✅ | ❌ | ✅ remote |
-| Package install | ✅ | ❌ | ✅ remote |
-| Dev server | ✅ | ❌ | ✅ remote |
+| Command execution | ✅ | ❌ | ✅ allowlisted profiles |
+| Package install | ✅ | ❌ | ✅ allowlisted profiles |
+| Dev server | ✅ | ❌ | ✅ allowlisted profiles |
 | Live preview | ✅ | ❌ | ✅ remote |
 | AI chat | ✅ | ✅ | ✅ |
 | Code generation | ✅ | ✅ | ✅ |

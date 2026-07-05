@@ -6,7 +6,7 @@ This document details the architecture, secure communication model, API contract
 
 ## 1. Overview & Architecture
 
-Since WebContainer and native command execution are unavailable in standard mobile WebViews, bolt.diy Android can optionally connect to a **Remote Runtime Server**. Phase 5.3 implements a file-sync MVP only: Android IndexedDB remains the local source of truth, text files can be pushed/pulled explicitly, and command execution remains stubbed.
+Since WebContainer and native command execution are unavailable in standard mobile WebViews, bolt.diy Android can optionally connect to a **Remote Runtime Server**. Android IndexedDB remains the local source of truth for files. Phase 5.4 adds safe command execution using predefined allowlisted command profiles only; free-form shell input is not supported.
 
 ```mermaid
 sequenceDiagram
@@ -21,9 +21,13 @@ sequenceDiagram
     Server->>Docker: Write files to sandbox folder
     Server-->>App: 200 OK
 
-    App->>Server: GET /workspace/:id/files?includeContent=true
-    Server-->>App: Remote file metadata and text content
-    App->>App: User-initiated pull writes missing files to IndexedDB
+    App->>Server: WS /workspace/:id/events?token=...
+    Server-->>App: Authenticated event stream
+
+    App->>Server: POST /workspace/:id/commands { commandProfile: "npm run build" }
+    Server->>Server: Spawn allowlisted command in workspace cwd
+    Server-->>App: 202 Command record
+    Server-->>App: stdout/stderr/status/exit events over WebSocket
 ```
 
 ---
@@ -121,15 +125,54 @@ All REST endpoints require the HTTP Header: `Authorization: Bearer <token>`.
 - **MVP constraints:** nested directories are supported, path traversal is blocked, and non-text-safe payloads are rejected.
 
 #### `POST /workspace/:id/commands`
-- **Description:** Stub only. No shell command is executed in Phase 5.3.
+- **Description:** Starts one safe predefined command profile inside the workspace directory.
+- **Security:** No arbitrary shell input is accepted. Request body must contain `commandProfile`.
 - **Request Body:**
   ```json
   {
-    "command": "npm install",
-    "args": ["--legacy-peer-deps"]
+    "commandProfile": "npm run build"
   }
   ```
-- **Response:** `202 Accepted` (execution status streamed over WebSocket).
+- **Allowed profiles:**
+  - `npm install`
+  - `npm run dev`
+  - `npm run build`
+  - `pnpm install`
+  - `pnpm run dev`
+  - `pnpm run build`
+- **Response:** `202 Accepted`
+  ```json
+  {
+    "commandId": "cmd_abc123xyz",
+    "commandProfile": "npm run build",
+    "workspaceId": "ws_abc123xyz",
+    "status": "running",
+    "startedAt": "2026-07-05T10:00:00.000Z"
+  }
+  ```
+- **Runtime behavior:** command runs with `cwd` set to the workspace path, uses fixed allowlisted arguments, streams output over WebSocket, and is stopped after `REMOTE_RUNTIME_COMMAND_TIMEOUT_MS` or the default timeout.
+- **Windows note:** npm/pnpm profiles launch through `cmd.exe /d /s /c` with static profile arguments so `.cmd` package-manager shims work; the client still cannot provide arbitrary command text.
+
+#### `GET /workspace/:id/commands/:commandId`
+- **Description:** Returns current command status.
+- **Response:** `200 OK`
+  ```json
+  {
+    "commandId": "cmd_abc123xyz",
+    "commandProfile": "npm run build",
+    "workspaceId": "ws_abc123xyz",
+    "status": "exited",
+    "startedAt": "2026-07-05T10:00:00.000Z",
+    "endedAt": "2026-07-05T10:00:12.000Z",
+    "exitCode": 0,
+    "signal": null
+  }
+  ```
+
+#### `POST /workspace/:id/commands/:commandId/stop`
+- **Description:** Requests termination of a running command.
+- **Behavior:** Stops the command process; on Windows, the process tree is terminated so npm/pnpm child processes do not keep running after the wrapper exits.
+- **Response:** `200 OK` with the updated command record.
 
 #### `GET /workspace/:id/preview`
 - **Description:** Returns the active port mapping and public tunnel preview URL if a dev server is running.
@@ -147,46 +190,58 @@ All REST endpoints require the HTTP Header: `Authorization: Bearer <token>`.
 
 ### 2.2 WebSocket Channel: `WS /workspace/:id/events`
 
-Used to stream terminal input, output, process control, and live status updates.
+Used to stream command output and live status updates for allowlisted command profiles.
 
 #### Client Messages (App → Server)
-- **Initiate Terminal Session:**
+- Free-form WebSocket input is disabled in Phase 5.4.
+- Commands are started with `POST /workspace/:id/commands`.
+- Commands are stopped with `POST /workspace/:id/commands/:commandId/stop`.
+- Any client WebSocket message is ignored and receives a status response:
   ```json
-  { "type": "terminal_start", "cols": 80, "rows": 24 }
-  ```
-- **Send Terminal Keystroke / Stdin:**
-  ```json
-  { "type": "stdin", "data": "ls -la\n" }
-  ```
-- **Resize Terminal:**
-  ```json
-  { "type": "resize", "cols": 90, "rows": 30 }
-  ```
-- **Terminate Process:**
-  ```json
-  { "type": "kill", "signal": "SIGINT" }
+  {
+    "type": "status",
+    "payload": {
+      "status": "input_ignored",
+      "output": "Free-form terminal input is disabled. Use command profiles only.\n"
+    }
+  }
   ```
 
 #### Server Messages (Server → App)
 - **Terminal Output Stream (stdout/stderr):**
   ```json
-  { "type": "stdout", "data": "\u001b[34mpackage.json\u001b[0m\r\n" }
+  {
+    "type": "stdout",
+    "timestamp": "2026-07-05T10:00:01.000Z",
+    "payload": {
+      "commandId": "cmd_abc123xyz",
+      "commandProfile": "npm run build",
+      "output": "vite build..."
+    }
+  }
   ```
 - **Process Lifecycle Events:**
   ```json
-  { "type": "exit", "code": 0 }
+  {
+    "type": "exit",
+    "timestamp": "2026-07-05T10:00:12.000Z",
+    "payload": {
+      "commandId": "cmd_abc123xyz",
+      "commandProfile": "npm run build",
+      "status": "exited",
+      "exitCode": 0
+    }
+  }
   ```
-- **Port Opened Notification (Dev Server Ready):**
-  ```json
-  { "type": "port_open", "port": 5173, "url": "https://preview-ws-123.runtime.host" }
-  ```
-
 ---
 
 ## 3. Security Requirements
 1. **Token Authentication:** Every REST request and WebSocket connection upgrade MUST be validated with a cryptographically secure token.
 2. **Sandbox Isolation:** Each workspace ID must map to a separate directory (under `remote-runtime/workspaces/`). Strict resolution checks are enforced to block traversal attempts.
 3. **Encrypted Traffic:** All endpoints must be served over HTTPS/WSS in production.
+4. **Command Profiles Only:** Remote command execution accepts only the documented `commandProfile` values. The server never executes user-provided shell strings or args.
+5. **Workspace CWD:** Commands run only with `cwd` set to the resolved workspace directory.
+6. **Timeouts:** Commands are terminated after `REMOTE_RUNTIME_COMMAND_TIMEOUT_MS` or the default timeout.
 
 ---
 
@@ -201,6 +256,7 @@ The remote runtime package resides in `remote-runtime/`.
    REMOTE_RUNTIME_TOKEN=change-me
    REMOTE_RUNTIME_PORT=8787
    REMOTE_RUNTIME_HOST=0.0.0.0
+   REMOTE_RUNTIME_COMMAND_TIMEOUT_MS=300000
    ```
 
 2. **Boot the Server:**
@@ -226,6 +282,11 @@ When testing from a phone, `localhost` and `127.0.0.1` point to the phone, not y
 3. **Safe File Sync:**
    ```bash
    curl -i -X PUT -H "Authorization: Bearer change-me" -H "Content-Type: application/json" -d '{"files": {"index.html": "<h1>Hello</h1>"}}' http://127.0.0.1:8787/workspace/ws_example123/files
+   ```
+
+4. **Safe Command Profile:**
+   ```bash
+   curl -i -X POST -H "Authorization: Bearer change-me" -H "Content-Type: application/json" -d '{"commandProfile":"npm run build"}' http://127.0.0.1:8787/workspace/ws_example123/commands
    ```
 
 ## 5. File Sync Semantics

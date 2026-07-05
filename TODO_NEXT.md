@@ -1,7 +1,7 @@
 # TODO: Next Steps for Android Port
 
 **Last updated:** 2026-07-04
-**Current phase:** Phase 0, 1, 3, 4, 5.3, 6 (debug compile) complete; Phase 2 (mobile UI) and Phase 5b (AI provider integration) next.
+**Current phase:** Phase 0, 1, 3, 4, 5.3, 5.4, 6 (debug compile) complete; Phase 2 (mobile UI) and Phase 5b (AI provider integration) next.
 
 ---
 
@@ -147,6 +147,33 @@
 - [x] Add sync controls/status to Android Settings and Runtime Mode UI
 - [x] Update docs with LAN setup guidance: `REMOTE_RUNTIME_HOST=0.0.0.0`, `REMOTE_RUNTIME_PORT=8787`, and `http://192.168.x.x:8787`
 - [x] **Commit:** `feat: add remote runtime file sync`
+
+---
+
+## Phase 5.4: Safe Remote Command Execution MVP ✅ DONE
+
+**Goal:** Allow Android to run safe predefined project commands through Remote Runtime without free-form shell input.
+
+- [x] Implement command profile mapping in `remote-runtime/src/commands.ts`
+- [x] Allow only these command profiles:
+  - [x] `npm install`
+  - [x] `npm run dev`
+  - [x] `npm run build`
+  - [x] `pnpm install`
+  - [x] `pnpm run dev`
+  - [x] `pnpm run build`
+- [x] Implement `POST /workspace/:id/commands` with `commandProfile` only
+- [x] Implement `GET /workspace/:id/commands/:commandId`
+- [x] Implement `POST /workspace/:id/commands/:commandId/stop`
+- [x] Require auth token and valid workspace for command routes and WebSocket events
+- [x] Execute only inside the workspace directory with fixed allowlisted arguments
+- [x] Enforce `REMOTE_RUNTIME_COMMAND_TIMEOUT_MS` default timeout
+- [x] Stream stdout/stderr/status/exit over WebSocket
+- [x] Log command start/end/error
+- [x] Update `RemoteRuntimeClient` command methods
+- [x] Update Android terminal fallback UI with remote command buttons, streamed output, and stop control
+- [x] Keep free-form terminal input disabled
+- [x] **Commit:** `feat: add safe remote command execution`
 
 ---
 

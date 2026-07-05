@@ -35,12 +35,51 @@ export interface ReadFileResponse {
   modifiedAt: string;
 }
 
+export const REMOTE_COMMAND_PROFILES = [
+  'npm install',
+  'npm run dev',
+  'npm run build',
+  'pnpm install',
+  'pnpm run dev',
+  'pnpm run build',
+] as const;
+
+export type RemoteCommandProfile = (typeof REMOTE_COMMAND_PROFILES)[number];
+export type RemoteCommandStatus = 'running' | 'exited' | 'stopped' | 'error' | 'timed-out';
+
+export interface RemoteCommandResponse {
+  commandId: string;
+  commandProfile: RemoteCommandProfile;
+  workspaceId: string;
+  status: RemoteCommandStatus;
+  startedAt: string;
+  endedAt?: string;
+  exitCode?: number | null;
+  signal?: string | null;
+  error?: string;
+}
+
+export interface RemoteRuntimeEvent {
+  type: 'status' | 'stdout' | 'stderr' | 'exit';
+  timestamp: string;
+  payload: {
+    commandId?: string;
+    commandProfile?: RemoteCommandProfile;
+    status?: RemoteCommandStatus | string;
+    output?: string;
+    exitCode?: number | null;
+    signal?: string | null;
+    error?: string;
+    workspaceId?: string;
+  };
+}
+
 /**
  * RemoteRuntimeClient
  *
  * Client SDK to communicate with the bolt.diy Android Remote Runtime server.
  * Handles server health status checks, workspace creation, files syncing,
- * and sets up stubs for WebSocket/command execution.
+ * allowlisted command profiles, and WebSocket event streaming.
  */
 export class RemoteRuntimeClient {
   private serverUrl: string;
@@ -194,24 +233,43 @@ export class RemoteRuntimeClient {
   }
 
   /**
-   * Run Command (Stub): POST /workspace/:id/commands
+   * Run allowlisted command profile: POST /workspace/:id/commands
    */
-  async runCommand(command: string, args: string[] = []): Promise<{ commandId: string }> {
+  async runCommand(commandProfile: RemoteCommandProfile): Promise<RemoteCommandResponse> {
     if (!this.workspaceId) {
       throw new Error('Workspace ID is not set.');
     }
 
-    console.log(`[RemoteRuntimeClient] Stub: runCommand "${command}" with args:`, args);
-    
-    // Command execution is scaffolded/stubbed for now
-    return { commandId: 'cmd_mock_' + Math.random().toString(36).substring(2, 11) };
+    return this.request<RemoteCommandResponse>(`/workspace/${this.workspaceId}/commands`, {
+      method: 'POST',
+      body: JSON.stringify({ commandProfile }),
+    });
   }
 
   /**
-   * Stop Command (Stub)
+   * Get command status: GET /workspace/:id/commands/:commandId
    */
-  async stopCommand(commandId: string): Promise<void> {
-    console.log(`[RemoteRuntimeClient] Stub: stopCommand "${commandId}"`);
+  async getCommandStatus(commandId: string): Promise<RemoteCommandResponse> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    return this.request<RemoteCommandResponse>(`/workspace/${this.workspaceId}/commands/${commandId}`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Stop command: POST /workspace/:id/commands/:commandId/stop
+   */
+  async stopCommand(commandId: string): Promise<RemoteCommandResponse> {
+    if (!this.workspaceId) {
+      throw new Error('Workspace ID is not set.');
+    }
+
+    return this.request<RemoteCommandResponse>(`/workspace/${this.workspaceId}/commands/${commandId}/stop`, {
+      method: 'POST',
+    });
   }
 
   /**
@@ -227,16 +285,17 @@ export class RemoteRuntimeClient {
   }
 
   /**
-   * WebSocket Connection (Stub): WS /workspace/:id/events
+   * WebSocket Connection: WS /workspace/:id/events
    */
-  connectWebSocket(onMessage: (event: any) => void): WebSocket {
+  connectWebSocket(onMessage: (event: RemoteRuntimeEvent) => void): WebSocket {
     if (!this.workspaceId) {
       throw new Error('Workspace ID is not set.');
     }
 
     const wsScheme = this.serverUrl.startsWith('https') ? 'wss' : 'ws';
     const cleanHost = this.serverUrl.replace(/^https?:\/\//, '');
-    const wsUrl = `${wsScheme}://${cleanHost}/workspace/${this.workspaceId}/events`;
+    const tokenQuery = this.token ? `?token=${encodeURIComponent(this.token)}` : '';
+    const wsUrl = `${wsScheme}://${cleanHost}/workspace/${this.workspaceId}/events${tokenQuery}`;
 
     console.log(`[RemoteRuntimeClient] Connecting to WebSocket: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
@@ -256,7 +315,7 @@ export class RemoteRuntimeClient {
   /**
    * Connect Events alias
    */
-  connectEvents(onMessage: (event: any) => void): WebSocket {
+  connectEvents(onMessage: (event: RemoteRuntimeEvent) => void): WebSocket {
     return this.connectWebSocket(onMessage);
   }
 }

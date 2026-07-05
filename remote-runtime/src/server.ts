@@ -15,12 +15,21 @@ import {
   readWorkspaceTextFile,
   writeWorkspaceFiles,
 } from './files.js';
+import {
+  getCommand,
+  isCommandProfile,
+  listCommandProfiles,
+  startCommand,
+  stopCommand,
+  type CommandEvent,
+} from './commands.js';
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
+const workspaceSockets = new Map<string, Set<WebSocket>>();
 
 const PORT = parseInt(process.env.REMOTE_RUNTIME_PORT || '8787', 10);
 const HOST = process.env.REMOTE_RUNTIME_HOST || '127.0.0.1';
@@ -36,6 +45,22 @@ function ensureWorkspaceExists(id: string) {
   const workspacePath = getWorkspacePath(id);
 
   return fs.existsSync(workspacePath);
+}
+
+function broadcastWorkspaceEvent(workspaceId: string, event: CommandEvent) {
+  const sockets = workspaceSockets.get(workspaceId);
+
+  if (!sockets) {
+    return;
+  }
+
+  const payload = JSON.stringify(event);
+
+  for (const socket of sockets) {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(payload);
+    }
+  }
 }
 
 /**
@@ -216,10 +241,11 @@ app.get('/workspace/:id/preview', requireAuth, (req, res) => {
 });
 
 /**
- * POST /workspace/:id/commands (Stub)
+ * POST /workspace/:id/commands
  */
 app.post('/workspace/:id/commands', requireAuth, (req, res) => {
   const { id } = req.params;
+  const { commandProfile } = req.body ?? {};
 
   if (!isValidWorkspaceId(id)) {
     jsonError(res, 400, 'Invalid workspace ID format.');
@@ -231,10 +257,80 @@ app.post('/workspace/:id/commands', requireAuth, (req, res) => {
     return;
   }
 
-  res.status(202).json({
-    commandId: 'cmd_mock_' + Math.random().toString(36).substring(2, 11),
-    message: 'Command execution stub registered. Safety filters active; no actions performed.',
+  if (!isCommandProfile(commandProfile)) {
+    jsonError(
+      res,
+      400,
+      `Invalid commandProfile. Allowed profiles: ${listCommandProfiles().join(', ')}.`,
+    );
+    return;
+  }
+
+  try {
+    const command = startCommand(id, getWorkspacePath(id), commandProfile, (event) => {
+      broadcastWorkspaceEvent(id, event);
+    });
+    res.status(202).json(command);
+  } catch (error: any) {
+    console.error(`[RemoteRuntime] Error starting command for ${id}`, error);
+    jsonError(res, 500, error.message || 'Internal server error');
+  }
+});
+
+/**
+ * GET /workspace/:id/commands/:commandId
+ */
+app.get('/workspace/:id/commands/:commandId', requireAuth, (req, res) => {
+  const { id, commandId } = req.params;
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  const command = getCommand(commandId);
+
+  if (!command || command.workspaceId !== id) {
+    jsonError(res, 404, 'Command not found.');
+    return;
+  }
+
+  res.status(200).json(command);
+});
+
+/**
+ * POST /workspace/:id/commands/:commandId/stop
+ */
+app.post('/workspace/:id/commands/:commandId/stop', requireAuth, (req, res) => {
+  const { id, commandId } = req.params;
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  const command = getCommand(commandId);
+
+  if (!command || command.workspaceId !== id) {
+    jsonError(res, 404, 'Command not found.');
+    return;
+  }
+
+  const stoppedCommand = stopCommand(commandId, (event) => {
+    broadcastWorkspaceEvent(id, event);
   });
+
+  res.status(200).json(stoppedCommand);
 });
 
 /**
@@ -255,6 +351,12 @@ server.on('upgrade', (request, socket, head) => {
 
   const workspaceId = match[1];
   const queryToken = parsedUrl.query.token as string | undefined;
+
+  if (!isValidWorkspaceId(workspaceId) || !ensureWorkspaceExists(workspaceId)) {
+    socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+    socket.destroy();
+    return;
+  }
 
   // Retrieve token from query params or sec-websocket-protocol
   let token = queryToken;
@@ -283,6 +385,9 @@ server.on('upgrade', (request, socket, head) => {
  */
 wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, workspaceId: string) => {
   console.log(`[RemoteRuntime] Client connected to events channel for workspace: ${workspaceId}`);
+  const sockets = workspaceSockets.get(workspaceId) ?? new Set<WebSocket>();
+  sockets.add(ws);
+  workspaceSockets.set(workspaceId, sockets);
 
   // Send status connection event
   ws.send(JSON.stringify({
@@ -292,16 +397,22 @@ wss.on('connection', (ws: WebSocket, request: http.IncomingMessage, workspaceId:
   }));
 
   ws.on('message', (message) => {
-    console.log(`[RemoteRuntime] Received message in workspace ${workspaceId}: ${message}`);
-    // Safe placeholder: echo message back for verification
+    console.log(`[RemoteRuntime] Ignored WebSocket input in workspace ${workspaceId}: ${message}`);
     ws.send(JSON.stringify({
-      type: 'stdout',
+      type: 'status',
       timestamp: new Date().toISOString(),
-      payload: { output: `Server received: ${message.toString()}` },
+      payload: { status: 'input_ignored', output: 'Free-form terminal input is disabled. Use command profiles only.\n' },
     }));
   });
 
   ws.on('close', () => {
+    const currentSockets = workspaceSockets.get(workspaceId);
+    currentSockets?.delete(ws);
+
+    if (currentSockets?.size === 0) {
+      workspaceSockets.delete(workspaceId);
+    }
+
     console.log(`[RemoteRuntime] Connection closed for workspace: ${workspaceId}`);
   });
 });
@@ -315,6 +426,6 @@ server.listen(PORT, HOST, () => {
   console.log(`====================================================`);
   console.log(` Running on: http://${HOST}:${PORT} `);
   console.log(` Workspaces: ${getWorkspacePath('example').replace('example', '')} `);
-  console.log(` Mode: Sandboxed (Command execution stubs active) `);
+  console.log(` Mode: Sandboxed (Allowlisted command profiles only) `);
   console.log(`====================================================`);
 });

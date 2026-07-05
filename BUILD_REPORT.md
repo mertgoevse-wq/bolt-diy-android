@@ -242,6 +242,35 @@ No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing
 
 ---
 
+## Phase 5.4: Safe Remote Command Execution MVP
+
+### Implemented
+
+| Area | Change |
+|------|--------|
+| Command profiles | Added `remote-runtime/src/commands.ts` with allowlisted profiles only: `npm install`, `npm run dev`, `npm run build`, `pnpm install`, `pnpm run dev`, `pnpm run build` |
+| Start command API | Implemented `POST /workspace/:id/commands` accepting `commandProfile` only |
+| Command status API | Implemented `GET /workspace/:id/commands/:commandId` |
+| Stop command API | Implemented `POST /workspace/:id/commands/:commandId/stop` with process-tree termination on Windows |
+| Execution safety | Requires auth, validates workspace, runs with `cwd` set to workspace path, uses fixed profile arguments, enforces timeout, and logs start/end/error |
+| WebSocket output | Streams `status`, `stdout`, `stderr`, and `exit` events to authenticated workspace WebSocket clients |
+| Free-form input | WebSocket input is ignored with an `input_ignored` status message |
+| Client SDK | Updated `RemoteRuntimeClient` with command profile types, `runCommand()`, `getCommandStatus()`, `stopCommand()`, and authenticated WebSocket URL |
+| Android terminal fallback | Shows Remote Runtime command buttons/output/stop control when configured; otherwise shows setup instructions |
+| Docs | Updated `docs/REMOTE_RUNTIME.md`, `README_ANDROID.md`, `CURRENT_STATUS.md`, `TODO_NEXT.md`, and this report |
+
+### Verification In This Run
+
+| Command / Check | Result |
+|-----------------|--------|
+| `npm run typecheck` | ✅ Passed |
+| `npm --prefix remote-runtime run build` | ✅ Passed |
+| Remote command API smoke | ✅ Passed; `npm run build` streamed `build-ok`, `npm run dev` stopped successfully, invalid profile rejected with HTTP 400 |
+| `npm run android:webbuild` | ✅ Passed; existing Vite/UnoCSS warnings only |
+| `npm run android:sync` | ✅ Passed; Capacitor sync completed |
+
+---
+
 ## Remaining Limitations
 
 | Area | Status | Notes |

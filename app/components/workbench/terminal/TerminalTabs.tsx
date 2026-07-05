@@ -10,8 +10,15 @@ import { Terminal, type TerminalRef } from './Terminal';
 import { TerminalManager } from './TerminalManager';
 import { createScopedLogger } from '~/utils/logger';
 import { runtimeModeStore } from '~/lib/stores/runtime-mode';
+import type { RuntimeModeState } from '~/lib/stores/runtime-mode';
 import { isCapacitor } from '~/lib/adapters/platform';
 import { toast } from 'react-toastify';
+import {
+  REMOTE_COMMAND_PROFILES,
+  RemoteRuntimeClient,
+  type RemoteCommandProfile,
+  type RemoteRuntimeEvent,
+} from '~/lib/remote-runtime/RemoteRuntimeClient';
 
 const logger = createScopedLogger('Terminal');
 
@@ -22,7 +29,8 @@ export const TerminalTabs = memo(() => {
   const showTerminal = useStore(workbenchStore.showTerminal);
   const theme = useStore(themeStore);
   const runtime = useStore(runtimeModeStore);
-  const showTerminalFallback = !runtime.capabilities.terminal;
+  const showRemoteCommandPanel = runtime.mode === 'remote' && (runtime.isAndroid || !runtime.webContainerAvailable);
+  const showTerminalFallback = !runtime.capabilities.terminal || showRemoteCommandPanel;
 
   const terminalRefs = useRef<Map<number, TerminalRef>>(new Map());
   const terminalPanelRef = useRef<ImperativePanelHandle>(null);
@@ -221,27 +229,7 @@ export const TerminalTabs = memo(() => {
             />
           </div>
           {showTerminalFallback ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-bolt-elements-terminals-background text-bolt-elements-textPrimary">
-              <div className="i-ph:terminal-window-duotone text-5xl text-bolt-elements-textSecondary mb-3" />
-              <h3 className="text-md font-semibold mb-1">Terminal Unavailable</h3>
-              <p className="text-xs text-bolt-elements-textSecondary max-w-sm mb-4 leading-relaxed">
-                Interactive terminals require a WebContainer environment (only supported on desktop browsers) or a Remote Runtime connection.
-              </p>
-              <button
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    if (isCapacitor()) {
-                      window.dispatchEvent(new CustomEvent('open-mobile-tab', { detail: 'settings' }));
-                    } else {
-                      toast.info("Please open Settings > Runtime Mode from the sidebar to configure Remote Runtime.");
-                    }
-                  }
-                }}
-                className="px-3.5 py-1.5 bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text rounded-lg text-xs font-medium transition-colors"
-              >
-                Configure Remote Runtime
-              </button>
-            </div>
+            <RemoteCommandPanel runtime={runtime} showRemoteCommandPanel={showRemoteCommandPanel} />
           ) : (
             Array.from({ length: terminalCount + 1 }, (_, index) => {
               const isActive = activeTerminal === index;
@@ -304,3 +292,231 @@ export const TerminalTabs = memo(() => {
     </Panel>
   );
 });
+
+function RemoteCommandPanel({
+  runtime,
+  showRemoteCommandPanel,
+}: {
+  runtime: RuntimeModeState;
+  showRemoteCommandPanel: boolean;
+}) {
+  const wsRef = useRef<WebSocket | null>(null);
+  const [output, setOutput] = useState('');
+  const [activeCommandId, setActiveCommandId] = useState<string | undefined>();
+  const [runningProfile, setRunningProfile] = useState<RemoteCommandProfile | undefined>();
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [lastError, setLastError] = useState<string | undefined>();
+
+  const missingConfig = [
+    !runtime.remoteRuntimeUrl.trim() ? 'server URL' : undefined,
+    !runtime.remoteAuthToken.trim() ? 'auth token' : undefined,
+    !runtime.remoteWorkspaceId.trim() ? 'workspace ID' : undefined,
+  ].filter(Boolean) as string[];
+  const remoteConfigured = showRemoteCommandPanel && missingConfig.length === 0;
+
+  const appendOutput = useCallback((chunk: string) => {
+    setOutput((current) => {
+      const next = `${current}${chunk}`;
+      return next.length > 20000 ? next.slice(-20000) : next;
+    });
+  }, []);
+
+  const createClient = useCallback(() => {
+    return new RemoteRuntimeClient(runtime.remoteRuntimeUrl, runtime.remoteAuthToken, runtime.remoteWorkspaceId);
+  }, [runtime.remoteAuthToken, runtime.remoteRuntimeUrl, runtime.remoteWorkspaceId]);
+
+  const handleEvent = useCallback(
+    (event: RemoteRuntimeEvent) => {
+      const { payload } = event;
+
+      if (event.type === 'stdout' || event.type === 'stderr') {
+        appendOutput(payload.output ?? '');
+        return;
+      }
+
+      if (event.type === 'status') {
+        if (payload.status === 'connected') {
+          appendOutput('[remote] connected\n');
+        } else if (payload.output) {
+          appendOutput(`[remote] ${payload.output}`);
+        }
+        return;
+      }
+
+      if (event.type === 'exit') {
+        const status = payload.status ?? 'exited';
+        const code = payload.exitCode === null || payload.exitCode === undefined ? '' : ` code=${payload.exitCode}`;
+        const error = payload.error ? ` error=${payload.error}` : '';
+        appendOutput(`\n[remote] command ${status}${code}${error}\n`);
+        setActiveCommandId(undefined);
+        setRunningProfile(undefined);
+      }
+    },
+    [appendOutput],
+  );
+
+  const connectEvents = useCallback(async () => {
+    if (!remoteConfigured) {
+      throw new Error(`Remote Runtime is not configured. Missing: ${missingConfig.join(', ')}.`);
+    }
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    setIsConnecting(true);
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = createClient().connectEvents(handleEvent);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setIsConnecting(false);
+        resolve();
+      };
+
+      ws.onerror = () => {
+        setIsConnecting(false);
+        reject(new Error('Remote Runtime event stream failed to connect.'));
+      };
+
+      ws.onclose = () => {
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+      };
+    });
+  }, [createClient, handleEvent, missingConfig, remoteConfigured]);
+
+  useEffect(() => {
+    return () => {
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, []);
+
+  const handleOpenSettings = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (isCapacitor()) {
+      window.dispatchEvent(new CustomEvent('open-mobile-tab', { detail: 'settings' }));
+    } else {
+      toast.info('Please open Settings > Runtime Mode from the sidebar to configure Remote Runtime.');
+    }
+  }, []);
+
+  const runProfile = useCallback(
+    async (commandProfile: RemoteCommandProfile) => {
+      setLastError(undefined);
+
+      try {
+        await connectEvents();
+        appendOutput(`\n$ ${commandProfile}\n`);
+        const command = await createClient().runCommand(commandProfile);
+        setActiveCommandId(command.commandId);
+        setRunningProfile(commandProfile);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to run remote command.';
+        setLastError(message);
+        appendOutput(`\n[remote:error] ${message}\n`);
+      }
+    },
+    [appendOutput, connectEvents, createClient],
+  );
+
+  const stopActiveCommand = useCallback(async () => {
+    if (!activeCommandId) {
+      return;
+    }
+
+    setLastError(undefined);
+
+    try {
+      await createClient().stopCommand(activeCommandId);
+      appendOutput(`\n[remote] stop requested for ${activeCommandId}\n`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to stop remote command.';
+      setLastError(message);
+      appendOutput(`\n[remote:error] ${message}\n`);
+    }
+  }, [activeCommandId, appendOutput, createClient]);
+
+  if (!remoteConfigured) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-bolt-elements-terminals-background text-bolt-elements-textPrimary">
+        <div className="i-ph:terminal-window-duotone text-5xl text-bolt-elements-textSecondary mb-3" />
+        <h3 className="text-md font-semibold mb-1">Terminal Unavailable</h3>
+        <p className="text-xs text-bolt-elements-textSecondary max-w-sm mb-4 leading-relaxed">
+          Interactive terminals require WebContainer or a configured Remote Runtime. Remote Runtime runs only safe
+          predefined command profiles.
+        </p>
+        {showRemoteCommandPanel && missingConfig.length > 0 && (
+          <p className="text-xs text-amber-400 max-w-sm mb-4">Missing: {missingConfig.join(', ')}.</p>
+        )}
+        <button
+          onClick={handleOpenSettings}
+          className="px-3.5 py-1.5 bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text rounded-lg text-xs font-medium transition-colors"
+        >
+          Configure Remote Runtime
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col bg-bolt-elements-terminals-background text-bolt-elements-textPrimary">
+      <div className="border-b border-bolt-elements-borderColor p-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold">Remote Runtime Commands</h3>
+            <p className="text-xs text-bolt-elements-textSecondary">
+              Safe predefined profiles only. Free-form terminal input is disabled.
+            </p>
+          </div>
+          <div className="text-[10px] uppercase text-bolt-elements-textSecondary">
+            {isConnecting ? 'connecting' : runningProfile ? `running ${runningProfile}` : 'ready'}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {REMOTE_COMMAND_PROFILES.map((profile) => (
+            <button
+              key={profile}
+              onClick={() => runProfile(profile)}
+              disabled={Boolean(activeCommandId) || isConnecting}
+              className="px-3 py-2 rounded-md border border-bolt-elements-borderColor text-xs font-medium text-bolt-elements-textPrimary hover:bg-bolt-elements-background-depth-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {profile}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={stopActiveCommand}
+            disabled={!activeCommandId}
+            className="px-3 py-1.5 rounded-md bg-red-600/90 hover:bg-red-600 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Stop running command
+          </button>
+          <button
+            onClick={() => setOutput('')}
+            className="px-3 py-1.5 rounded-md border border-bolt-elements-borderColor text-xs text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-3"
+          >
+            Clear output
+          </button>
+        </div>
+
+        {lastError && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">{lastError}</div>
+        )}
+      </div>
+
+      <pre className="flex-1 min-h-0 overflow-auto whitespace-pre-wrap break-words p-3 text-xs leading-relaxed text-bolt-elements-textSecondary">
+        {output || '[remote] Select a command profile to start.\n'}
+      </pre>
+    </div>
+  );
+}
