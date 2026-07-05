@@ -197,7 +197,7 @@ To provide a seamless experience on mobile where WebContainer features (like she
 | `app/lib/persistence/androidFallbackStorage.ts` | Present; used as the local source of truth for sync |
 | `app/components/mobile/AndroidSettingsPanel.tsx` | Present; extended with file-sync controls/status |
 | `app/components/@settings/tabs/runtime/RuntimeModeTab.tsx` | Present; extended with Remote Runtime token/workspace fields and file-sync controls/status |
-| `remote-runtime/src/server.ts` | Present; extended file API while keeping command execution stubbed |
+| `remote-runtime/src/server.ts` | Present; extended file API while keeping command execution stubbed for Phase 5.3; superseded by Phase 5.4 command-profile endpoints |
 | `remote-runtime/src/files.ts` | Present; extended safe path resolution, metadata, text-only reads/writes |
 | `docs/REMOTE_RUNTIME.md` | Present; updated for file-sync MVP and LAN setup |
 | `README_ANDROID.md` | Present; updated with Remote Runtime sync usage |
@@ -223,7 +223,7 @@ No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing
 - Added binary/non-text skip warnings and synced/skipped/conflict/error status fields.
 - Strengthened `RemoteRuntimeClient.ts` with typed file metadata, `readFile()`, typed `syncFiles()`, and clearer 401/403/404/500/network errors.
 - Hardened the remote file API for nested directories, path traversal, JSON errors, text-only payloads, metadata responses, `includeContent=true`, and single-file reads.
-- Left command execution as a stub; no shell command execution was implemented.
+- Left command execution as a stub for Phase 5.3; Phase 5.4 later replaced the stub with safe allowlisted command profiles.
 - Added Remote Runtime file-sync controls/status to Android Settings and Runtime Mode UI.
 - Updated Remote Runtime docs, Android guide, current status, TODO list, and this audit.
 
@@ -257,6 +257,7 @@ No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing
 | Free-form input | WebSocket input is ignored with an `input_ignored` status message |
 | Client SDK | Updated `RemoteRuntimeClient` with command profile types, `runCommand()`, `getCommandStatus()`, `stopCommand()`, and authenticated WebSocket URL |
 | Android terminal fallback | Shows Remote Runtime command buttons/output/stop control when configured; otherwise shows setup instructions |
+| Command status panel | Added last profile, command ID, status, last output timestamp, and exit code display in the Remote Runtime terminal panel |
 | Docs | Updated `docs/REMOTE_RUNTIME.md`, `README_ANDROID.md`, `CURRENT_STATUS.md`, `TODO_NEXT.md`, and this report |
 
 ### Verification In This Run
@@ -268,6 +269,47 @@ No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing
 | Remote command API smoke | ✅ Passed; `npm run build` streamed `build-ok`, `npm run dev` stopped successfully, invalid profile rejected with HTTP 400 |
 | `npm run android:webbuild` | ✅ Passed; existing Vite/UnoCSS warnings only |
 | `npm run android:sync` | ✅ Passed; Capacitor sync completed |
+
+### Phase 5.4 UI + Integration Audit
+
+| Area | Result |
+|------|--------|
+| `remote-runtime/src/commands.ts` | Present; allowlisted profiles only, fixed arguments, workspace `cwd`, timeout, stop/process-tree termination |
+| `remote-runtime/src/server.ts` | Present; auth-protected start/status/stop endpoints, workspace checks, WebSocket output/status streaming |
+| `RemoteRuntimeClient.ts` | Present; typed command profile methods and authenticated WebSocket URL |
+| Android settings | Present; Remote Runtime URL/token/workspace controls and corrected command-profile wording |
+| Terminal fallback | Present; command buttons, output stream, stop control, missing-config guidance; completed with command history/status panel |
+| Preview fallback | Present; remains static-preview focused and does not expose command input |
+
+### Server-Side Safety Audit
+
+| Requirement | Verified State |
+|-------------|----------------|
+| No arbitrary shell input | ✅ `POST /commands` accepts `commandProfile` only; WebSocket input is ignored |
+| Allowlisted profiles only | ✅ `isCommandProfile()` gates the six npm/pnpm profiles |
+| Token required | ✅ Command routes use `requireAuth`; WebSocket upgrade uses `validateToken()` |
+| Workspace-only execution | ✅ Workspace ID is validated, existence is checked, and command `cwd` is the resolved workspace path |
+| Timeout and stop | ✅ `REMOTE_RUNTIME_COMMAND_TIMEOUT_MS` is enforced and stop endpoint terminates the running command |
+| Event streaming | ✅ stdout/stderr/status/exit events are broadcast to authenticated workspace WebSocket clients |
+
+### Exact Changes Made In This Run
+
+- Audited the existing Phase 5.4 command server, client, terminal fallback, Android settings, and docs instead of rebuilding them.
+- Added a Remote Runtime command status panel showing last command profile, command ID, status, last output timestamp, and exit code.
+- Updated command event handling so stdout/stderr/status/exit events keep the status panel current.
+- Corrected stale Android settings copy that still said command execution was disabled.
+- Updated docs/status files for the UI integration verification pass.
+
+### Verification In This Run
+
+| Command / Check | Result |
+|-----------------|--------|
+| `npm install --legacy-peer-deps` | ✅ Passed; existing Node engine warnings and 54 npm audit findings reported |
+| `npm run typecheck` | ✅ Passed |
+| `npm run android:webbuild` | ✅ Passed; existing Vite/UnoCSS/icon/chunk warnings only |
+| `npm run android:sync` | ✅ Passed; Capacitor sync completed |
+| `npm --prefix remote-runtime install` | ✅ Passed; remote-runtime audit reported 0 vulnerabilities |
+| `npm --prefix remote-runtime run build` | ✅ Passed |
 
 ---
 

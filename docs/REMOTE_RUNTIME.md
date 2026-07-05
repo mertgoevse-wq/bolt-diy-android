@@ -192,6 +192,8 @@ All REST endpoints require the HTTP Header: `Authorization: Bearer <token>`.
 
 Used to stream command output and live status updates for allowlisted command profiles.
 
+The Android terminal fallback uses these events to render command output and a compact status panel with the last command profile, command ID, status, last output timestamp, and exit code.
+
 #### Client Messages (App → Server)
 - Free-form WebSocket input is disabled in Phase 5.4.
 - Commands are started with `POST /workspace/:id/commands`.

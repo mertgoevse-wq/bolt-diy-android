@@ -1,8 +1,8 @@
 # bolt.diy Android — Current Status
 
-**Last updated:** 2026-07-04  
+**Last updated:** 2026-07-05
 **Branch:** `main`  
-**Commits ahead of upstream:** 16  
+**Commits ahead of upstream:** 0 after latest push
 **Target device:** Samsung Galaxy A56 (Android 15, 1080×2340)
 
 ---
@@ -151,7 +151,7 @@ bolt-diy-android/
 | Mobile UI | ❌ Not started | Desktop layouts break at 360px (533px min-width, 1200px modal) |
 | APK build | ✅ Automated | `android:apk:debug` compiles the debug APK via Gradle wrapper |
 | Remote Runtime file sync | ✅ MVP complete | Explicit text-file push/pull/single-file sync; IndexedDB remains source of truth |
-| Remote Runtime command profiles | ✅ MVP complete | Safe allowlisted npm/pnpm install/dev/build profiles with WebSocket output and stop |
+| Remote Runtime command profiles | ✅ MVP complete | Safe allowlisted npm/pnpm install/dev/build profiles with WebSocket output, stop, and command status panel |
 | Device tested | ❌ Not yet | No physical device testing done |
 
 ---
@@ -162,7 +162,7 @@ bolt-diy-android/
 
 2. **Live preview fallback** — Dev server preview is unavailable without WebContainer/Remote Runtime, but a designed fallback view is shown, and the user can run a basic static preview of any local `index.html` file using local Blob URLs.
 
-3. **Terminal fallback** — The terminal cannot run a local shell process without WebContainer. In Android fallback mode it shows setup guidance; in Remote Runtime mode it shows safe npm/pnpm command-profile buttons and streamed output. Free-form terminal input is still disabled.
+3. **Terminal fallback** — The terminal cannot run a local shell process without WebContainer. In Android fallback mode it shows setup guidance; in Remote Runtime mode it shows safe npm/pnpm command-profile buttons, streamed output, stop control, and last-command status. Free-form terminal input is still disabled.
 
 4. **IndexedDB file persistence** — Files created by AI actions are saved to IndexedDB and restored on app restart. In-memory store is always in sync with IndexedDB.
 
@@ -193,7 +193,7 @@ bolt-diy-android/
 | Terminal process | ✅ Complete | Designed fallback and settings redirection implemented |
 | File system persistence | ✅ Complete | InMemoryFS with IndexedDB backing automatically saves and restores files |
 | Remote Runtime file sync | ✅ MVP complete | Text-only push/pull/current-file sync; local IndexedDB wins on conflict |
-| Remote Runtime command profiles | ✅ MVP complete | Allowlisted npm/pnpm profiles only; output streams over WebSocket |
+| Remote Runtime command profiles | ✅ MVP complete | Allowlisted npm/pnpm profiles only; output streams over WebSocket and command metadata is shown in the terminal panel |
 | Git operations | FS backend missing | Phase 3: InMemoryFS for isomorphic-git. GitHub Sync panel saves config only |
 | Settings modal | 1200px fixed width | Phase 2: `w-full max-w-[1200px]` |
 | Chat layout | Forces 533px min width | Phase 2: responsive CSS override |

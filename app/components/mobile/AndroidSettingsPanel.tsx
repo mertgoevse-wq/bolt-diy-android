@@ -320,7 +320,7 @@ export default function AndroidSettingsPanel() {
           </h2>
           <div className="android-card-content gap-3.5">
             <p className="text-xs text-bolt-elements-textSecondary leading-relaxed">
-              Remote Runtime can mirror local Android files to a trusted computer/server. Command execution is still disabled in this MVP.
+              Remote Runtime can mirror local Android files to a trusted computer/server and run safe predefined command profiles.
               On a phone, localhost points to the phone; use your laptop LAN IP, for example http://192.168.x.x:8787.
             </p>
 

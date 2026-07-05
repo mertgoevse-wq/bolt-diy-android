@@ -172,8 +172,10 @@
 - [x] Log command start/end/error
 - [x] Update `RemoteRuntimeClient` command methods
 - [x] Update Android terminal fallback UI with remote command buttons, streamed output, and stop control
+- [x] Add Android terminal command history/status panel with last profile, command ID, status, output timestamp, and exit code
 - [x] Keep free-form terminal input disabled
 - [x] **Commit:** `feat: add safe remote command execution`
+- [x] **Verification commit:** `chore: verify and finish safe remote command UI`
 
 ---
 

@@ -17,6 +17,7 @@ import {
   REMOTE_COMMAND_PROFILES,
   RemoteRuntimeClient,
   type RemoteCommandProfile,
+  type RemoteCommandStatus,
   type RemoteRuntimeEvent,
 } from '~/lib/remote-runtime/RemoteRuntimeClient';
 
@@ -300,10 +301,19 @@ function RemoteCommandPanel({
   runtime: RuntimeModeState;
   showRemoteCommandPanel: boolean;
 }) {
+  type CommandSummary = {
+    commandProfile?: RemoteCommandProfile;
+    commandId?: string;
+    status: RemoteCommandStatus | 'idle' | 'starting' | 'input_ignored' | string;
+    lastOutputAt?: string;
+    exitCode?: number | null;
+  };
+
   const wsRef = useRef<WebSocket | null>(null);
   const [output, setOutput] = useState('');
   const [activeCommandId, setActiveCommandId] = useState<string | undefined>();
   const [runningProfile, setRunningProfile] = useState<RemoteCommandProfile | undefined>();
+  const [lastCommand, setLastCommand] = useState<CommandSummary>({ status: 'idle' });
   const [isConnecting, setIsConnecting] = useState(false);
   const [lastError, setLastError] = useState<string | undefined>();
 
@@ -321,6 +331,23 @@ function RemoteCommandPanel({
     });
   }, []);
 
+  const updateCommandSummary = useCallback((event: RemoteRuntimeEvent) => {
+    const { payload } = event;
+    const isCommandEvent = Boolean(payload.commandId || payload.commandProfile);
+
+    if (!isCommandEvent && payload.status !== 'input_ignored') {
+      return;
+    }
+
+    setLastCommand((current) => ({
+      commandProfile: payload.commandProfile ?? current.commandProfile,
+      commandId: payload.commandId ?? current.commandId,
+      status: payload.status ?? current.status,
+      lastOutputAt: event.timestamp,
+      exitCode: event.type === 'exit' ? (payload.exitCode ?? null) : current.exitCode,
+    }));
+  }, []);
+
   const createClient = useCallback(() => {
     return new RemoteRuntimeClient(runtime.remoteRuntimeUrl, runtime.remoteAuthToken, runtime.remoteWorkspaceId);
   }, [runtime.remoteAuthToken, runtime.remoteRuntimeUrl, runtime.remoteWorkspaceId]);
@@ -328,6 +355,7 @@ function RemoteCommandPanel({
   const handleEvent = useCallback(
     (event: RemoteRuntimeEvent) => {
       const { payload } = event;
+      updateCommandSummary(event);
 
       if (event.type === 'stdout' || event.type === 'stderr') {
         appendOutput(payload.output ?? '');
@@ -352,7 +380,7 @@ function RemoteCommandPanel({
         setRunningProfile(undefined);
       }
     },
-    [appendOutput],
+    [appendOutput, updateCommandSummary],
   );
 
   const connectEvents = useCallback(async () => {
@@ -414,13 +442,27 @@ function RemoteCommandPanel({
       try {
         await connectEvents();
         appendOutput(`\n$ ${commandProfile}\n`);
+        setLastCommand({
+          commandProfile,
+          status: 'starting',
+          lastOutputAt: new Date().toISOString(),
+          exitCode: undefined,
+        });
         const command = await createClient().runCommand(commandProfile);
         setActiveCommandId(command.commandId);
         setRunningProfile(commandProfile);
+        setLastCommand({
+          commandProfile: command.commandProfile,
+          commandId: command.commandId,
+          status: command.status,
+          lastOutputAt: command.startedAt,
+          exitCode: command.exitCode,
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to run remote command.';
         setLastError(message);
         appendOutput(`\n[remote:error] ${message}\n`);
+        setLastCommand((current) => ({ ...current, status: 'error', lastOutputAt: new Date().toISOString() }));
       }
     },
     [appendOutput, connectEvents, createClient],
@@ -434,12 +476,22 @@ function RemoteCommandPanel({
     setLastError(undefined);
 
     try {
-      await createClient().stopCommand(activeCommandId);
+      const stoppedCommand = await createClient().stopCommand(activeCommandId);
+      setLastCommand({
+        commandProfile: stoppedCommand.commandProfile,
+        commandId: stoppedCommand.commandId,
+        status: stoppedCommand.status,
+        lastOutputAt: stoppedCommand.endedAt ?? new Date().toISOString(),
+        exitCode: stoppedCommand.exitCode,
+      });
+      setActiveCommandId(undefined);
+      setRunningProfile(undefined);
       appendOutput(`\n[remote] stop requested for ${activeCommandId}\n`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to stop remote command.';
       setLastError(message);
       appendOutput(`\n[remote:error] ${message}\n`);
+      setLastCommand((current) => ({ ...current, status: 'error', lastOutputAt: new Date().toISOString() }));
     }
   }, [activeCommandId, appendOutput, createClient]);
 
@@ -509,6 +561,20 @@ function RemoteCommandPanel({
           </button>
         </div>
 
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 rounded-md border border-bolt-elements-borderColor bg-bolt-elements-background-depth-2 p-2 text-[10px]">
+          <CommandSummaryField label="Last profile" value={lastCommand.commandProfile ?? 'None'} />
+          <CommandSummaryField label="Command ID" value={lastCommand.commandId ?? 'None'} />
+          <CommandSummaryField label="Status" value={lastCommand.status} />
+          <CommandSummaryField
+            label="Last output"
+            value={lastCommand.lastOutputAt ? new Date(lastCommand.lastOutputAt).toLocaleTimeString() : 'None'}
+          />
+          <CommandSummaryField
+            label="Exit code"
+            value={lastCommand.exitCode === undefined || lastCommand.exitCode === null ? 'None' : String(lastCommand.exitCode)}
+          />
+        </div>
+
         {lastError && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">{lastError}</div>
         )}
@@ -517,6 +583,17 @@ function RemoteCommandPanel({
       <pre className="flex-1 min-h-0 overflow-auto whitespace-pre-wrap break-words p-3 text-xs leading-relaxed text-bolt-elements-textSecondary">
         {output || '[remote] Select a command profile to start.\n'}
       </pre>
+    </div>
+  );
+}
+
+function CommandSummaryField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="uppercase text-bolt-elements-textTertiary">{label}</div>
+      <div className="truncate font-medium text-bolt-elements-textPrimary" title={value}>
+        {value}
+      </div>
     </div>
   );
 }

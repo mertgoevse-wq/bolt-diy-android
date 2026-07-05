@@ -171,7 +171,7 @@ The terminal fallback on Android does not accept free-form shell input. When Rem
 - `pnpm run dev`
 - `pnpm run build`
 
-Output streams back into the terminal panel over the Remote Runtime WebSocket, and the running command can be stopped from the same panel.
+Output streams back into the terminal panel over the Remote Runtime WebSocket, and the running command can be stopped from the same panel. The panel also shows the last command profile, command ID, current/final status, last output timestamp, and exit code when available.
 
 ### Setting up the Remote Runtime locally
 
