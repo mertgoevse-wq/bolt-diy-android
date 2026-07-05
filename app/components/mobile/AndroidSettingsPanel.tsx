@@ -322,6 +322,7 @@ export default function AndroidSettingsPanel() {
             <p className="text-xs text-bolt-elements-textSecondary leading-relaxed">
               Remote Runtime can mirror local Android files to a trusted computer/server and run safe predefined command profiles.
               On a phone, localhost points to the phone; use your laptop LAN IP, for example http://192.168.x.x:8787.
+              For live preview, run project dev servers with --host 0.0.0.0 or equivalent.
             </p>
 
             {/* URL Input */}

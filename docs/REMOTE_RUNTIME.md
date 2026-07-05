@@ -6,7 +6,7 @@ This document details the architecture, secure communication model, API contract
 
 ## 1. Overview & Architecture
 
-Since WebContainer and native command execution are unavailable in standard mobile WebViews, bolt.diy Android can optionally connect to a **Remote Runtime Server**. Android IndexedDB remains the local source of truth for files. Phase 5.4 adds safe command execution using predefined allowlisted command profiles only; free-form shell input is not supported.
+Since WebContainer and native command execution are unavailable in standard mobile WebViews, bolt.diy Android can optionally connect to a **Remote Runtime Server**. Android IndexedDB remains the local source of truth for files. Phase 5.4 adds safe command execution using predefined allowlisted command profiles only; free-form shell input is not supported. Phase 5.5 adds live preview status by detecting dev-server URLs from safe `npm run dev` / `pnpm run dev` command output.
 
 ```mermaid
 sequenceDiagram
@@ -28,6 +28,9 @@ sequenceDiagram
     Server->>Server: Spawn allowlisted command in workspace cwd
     Server-->>App: 202 Command record
     Server-->>App: stdout/stderr/status/exit events over WebSocket
+
+    App->>Server: GET /workspace/:id/preview
+    Server-->>App: Preview status + detected LAN URL
 ```
 
 ---
@@ -175,16 +178,27 @@ All REST endpoints require the HTTP Header: `Authorization: Bearer <token>`.
 - **Response:** `200 OK` with the updated command record.
 
 #### `GET /workspace/:id/preview`
-- **Description:** Returns the active port mapping and public tunnel preview URL if a dev server is running.
-- **Response:**
-  - `200 OK`
-  - Body:
-    ```json
-    {
-      "port": 5173,
-      "previewUrl": "https://preview-ws-123.runtime.host"
-    }
-    ```
+- **Description:** Returns live preview status detected from dev-server stdout/stderr. This endpoint returns JSON; it does not proxy traffic.
+- **Statuses:** `none`, `starting`, `running`, `failed`
+- **Response:** `200 OK`
+  ```json
+  {
+    "ok": true,
+    "status": "running",
+    "port": 5173,
+    "localUrl": "http://localhost:5173/",
+    "networkUrl": "http://192.168.1.123:5173/",
+    "previewUrl": "http://192.168.1.123:5173/",
+    "lastDetectedAt": "2026-07-05T12:00:00.000Z",
+    "commandId": "cmd_abc123xyz",
+    "message": "Dev server preview URL detected from command output."
+  }
+  ```
+- **Detection:** The Remote Runtime watches output from `npm run dev` and `pnpm run dev` for common Vite URLs such as `http://localhost:5173/`, `http://192.168.x.x:5173/`, and `http://0.0.0.0:5173/`.
+- **LAN limitation:** Android cannot load the laptop's `localhost`. If only a local URL is detected, `previewUrl` may be omitted and the response message explains that the dev server must bind to `0.0.0.0`.
+
+#### `GET /workspace/:id/preview-page`
+- **Description:** Safe HTML fallback page showing preview status and setup instructions. Use this for manual browser checks; the Android app uses the JSON endpoint above.
 
 ---
 
@@ -268,6 +282,14 @@ The remote runtime package resides in `remote-runtime/`.
    ```
 
 When testing from a phone, `localhost` and `127.0.0.1` point to the phone, not your laptop. Use the laptop LAN IP in Android settings, for example `http://192.168.x.x:8787`.
+
+For live preview, the project dev server must also bind to the LAN interface. For Vite, set the dev script or command to use `--host 0.0.0.0`, for example:
+
+```bash
+npm run dev -- --host 0.0.0.0
+```
+
+The Android app will use the detected network URL directly. No Remote Runtime preview proxy is implemented yet.
 
 ### 4.2 Verifying Endpoints
 

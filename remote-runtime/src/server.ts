@@ -23,6 +23,7 @@ import {
   stopCommand,
   type CommandEvent,
 } from './commands.js';
+import { getWorkspacePreview, observePreviewCommandEvent } from './preview.js';
 
 dotenv.config();
 
@@ -39,6 +40,20 @@ app.use(express.json({ limit: '50mb' }));
 
 function jsonError(res: express.Response, status: number, error: string) {
   res.status(status).json({ ok: false, error });
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const escapes: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+
+    return escapes[char];
+  });
 }
 
 function ensureWorkspaceExists(id: string) {
@@ -61,6 +76,11 @@ function broadcastWorkspaceEvent(workspaceId: string, event: CommandEvent) {
       socket.send(payload);
     }
   }
+}
+
+function observeAndBroadcastWorkspaceEvent(workspaceId: string, event: CommandEvent) {
+  observePreviewCommandEvent(workspaceId, event);
+  broadcastWorkspaceEvent(workspaceId, event);
 }
 
 /**
@@ -203,7 +223,7 @@ app.put('/workspace/:id/files', requireAuth, (req, res) => {
 });
 
 /**
- * GET /workspace/:id/preview (Stub)
+ * GET /workspace/:id/preview
  */
 app.get('/workspace/:id/preview', requireAuth, (req, res) => {
   const { id } = req.params;
@@ -218,22 +238,53 @@ app.get('/workspace/:id/preview', requireAuth, (req, res) => {
     return;
   }
 
+  res.status(200).json(getWorkspacePreview(id, req.get('host')));
+});
+
+/**
+ * GET /workspace/:id/preview-page
+ */
+app.get('/workspace/:id/preview-page', requireAuth, (req, res) => {
+  const { id } = req.params;
+
+  if (!isValidWorkspaceId(id)) {
+    jsonError(res, 400, 'Invalid workspace ID format.');
+    return;
+  }
+
+  if (!ensureWorkspaceExists(id)) {
+    jsonError(res, 404, 'Workspace not found.');
+    return;
+  }
+
+  const preview = getWorkspacePreview(id, req.get('host'));
+  const escapedMessage = escapeHtml(preview.message);
+  const escapedPreviewUrl = preview.previewUrl ? escapeHtml(preview.previewUrl) : undefined;
+
   res.status(200).send(`
     <html>
       <head>
-        <title>Remote Preview (Stub)</title>
+        <title>Remote Preview Status</title>
         <style>
           body { font-family: sans-serif; background: #0b0b0f; color: #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-          .card { background: #181824; padding: 2rem; border-radius: 12px; border: 1px solid #2e2e3f; max-width: 400px; text-align: center; }
+          .card { background: #181824; padding: 2rem; border-radius: 12px; border: 1px solid #2e2e3f; max-width: 520px; text-align: center; }
           h2 { color: #a855f7; margin-top: 0; }
           p { font-size: 0.9rem; color: #94a3b8; line-height: 1.5; }
+          code { color: #e9d5ff; }
+          a { color: #c084fc; }
         </style>
       </head>
       <body>
         <div class="card">
-          <h2>Remote Live Preview</h2>
+          <h2>Remote Live Preview Status</h2>
           <p>Workspace ID: <strong>${id}</strong></p>
-          <p>This is a safe preview tunnel placeholder. WebContainer operations and remote server dev ports will render here in a future release.</p>
+          <p>Status: <strong>${preview.status}</strong></p>
+          <p>${escapedMessage}</p>
+          ${
+            preview.previewUrl
+              ? `<p><a href="${escapedPreviewUrl}" target="_blank" rel="noreferrer">Open preview</a></p>`
+              : '<p>For phone access, run Vite with <code>--host 0.0.0.0</code> and use your laptop LAN IP.</p>'
+          }
         </div>
       </body>
     </html>
@@ -268,7 +319,7 @@ app.post('/workspace/:id/commands', requireAuth, (req, res) => {
 
   try {
     const command = startCommand(id, getWorkspacePath(id), commandProfile, (event) => {
-      broadcastWorkspaceEvent(id, event);
+      observeAndBroadcastWorkspaceEvent(id, event);
     });
     res.status(202).json(command);
   } catch (error: any) {
@@ -327,7 +378,7 @@ app.post('/workspace/:id/commands/:commandId/stop', requireAuth, (req, res) => {
   }
 
   const stoppedCommand = stopCommand(commandId, (event) => {
-    broadcastWorkspaceEvent(id, event);
+    observeAndBroadcastWorkspaceEvent(id, event);
   });
 
   res.status(200).json(stoppedCommand);

@@ -11,6 +11,7 @@ import { classNames } from '~/utils/classNames';
 import { runtimeModeStore } from '~/lib/stores/runtime-mode';
 import { isCapacitor } from '~/lib/adapters/platform';
 import { toast } from 'react-toastify';
+import { RemoteRuntimeClient, type RemotePreviewResponse } from '~/lib/remote-runtime/RemoteRuntimeClient';
 
 type ResizeSide = 'left' | 'right' | null;
 
@@ -78,6 +79,16 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
   const runtime = useStore(runtimeModeStore);
   const [useStaticPreview, setUseStaticPreview] = useState(false);
   const [staticUrl, setStaticUrl] = useState<string | null>(null);
+  const [remotePreview, setRemotePreview] = useState<RemotePreviewResponse | null>(null);
+  const [remotePreviewLoading, setRemotePreviewLoading] = useState(false);
+  const [remotePreviewError, setRemotePreviewError] = useState<string | null>(null);
+
+  const missingRemotePreviewConfig = [
+    !runtime.remoteRuntimeUrl.trim() ? 'server URL' : undefined,
+    !runtime.remoteAuthToken.trim() ? 'auth token' : undefined,
+    !runtime.remoteWorkspaceId.trim() ? 'workspace ID' : undefined,
+  ].filter(Boolean) as string[];
+  const remotePreviewConfigured = runtime.mode === 'remote' && missingRemotePreviewConfig.length === 0;
 
   const hasStaticHtml = Object.keys(files).some(
     (path) => path.endsWith('/index.html') || path === 'index.html'
@@ -128,6 +139,61 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
       }
     };
   }, [staticUrl]);
+
+  const refreshRemotePreview = useCallback(
+    async (options: { quiet?: boolean } = {}) => {
+      if (!remotePreviewConfigured) {
+        setRemotePreview(null);
+        setRemotePreviewError(null);
+        return;
+      }
+
+      setRemotePreviewLoading(true);
+      setRemotePreviewError(null);
+
+      try {
+        const client = new RemoteRuntimeClient(
+          runtime.remoteRuntimeUrl,
+          runtime.remoteAuthToken,
+          runtime.remoteWorkspaceId,
+        );
+        const preview = await client.getPreviewUrl();
+        setRemotePreview(preview);
+
+        if (preview.status === 'running' && preview.previewUrl) {
+          setUseStaticPreview(false);
+        }
+
+        if (!options.quiet) {
+          if (preview.previewUrl) {
+            toast.success('Remote preview refreshed');
+          } else {
+            toast.info(preview.message);
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to refresh remote preview.';
+        setRemotePreviewError(message);
+
+        if (!options.quiet) {
+          toast.error(message);
+        }
+      } finally {
+        setRemotePreviewLoading(false);
+      }
+    },
+    [remotePreviewConfigured, runtime.remoteAuthToken, runtime.remoteRuntimeUrl, runtime.remoteWorkspaceId],
+  );
+
+  useEffect(() => {
+    if (!remotePreviewConfigured) {
+      setRemotePreview(null);
+      setRemotePreviewError(null);
+      return;
+    }
+
+    void refreshRemotePreview({ quiet: true });
+  }, [refreshRemotePreview, remotePreviewConfigured]);
 
   const resizingState = useRef({
     isResizing: false,
@@ -622,6 +688,12 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
     }
   };
 
+  const openRemotePreviewExternally = () => {
+    if (remotePreview?.previewUrl) {
+      window.open(remotePreview.previewUrl, '_blank');
+    }
+  };
+
   // Function to get the correct frame padding based on orientation
   const getFramePadding = useCallback(() => {
     if (!selectedWindowSize) {
@@ -1080,6 +1152,39 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
                 containerRef={iframeRef}
               />
             </>
+          ) : remotePreview?.status === 'running' && remotePreview.previewUrl ? (
+            <div className="flex flex-col w-full h-full relative">
+              <div className="bg-purple-500/10 border-b border-purple-500/20 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-purple-400">
+                <span className="flex items-center gap-1.5 font-medium min-w-0">
+                  <span className="i-ph:broadcast-fill text-sm shrink-0" />
+                  <span className="truncate">
+                    Remote Preview: {remotePreview.previewUrl}
+                  </span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => refreshRemotePreview()}
+                    disabled={remotePreviewLoading}
+                    className="px-2 py-0.5 border border-purple-500/30 hover:bg-purple-500/10 rounded transition-colors disabled:opacity-50"
+                  >
+                    Refresh Preview
+                  </button>
+                  <button
+                    onClick={openRemotePreviewExternally}
+                    className="px-2 py-0.5 border border-purple-500/30 hover:bg-purple-500/10 rounded transition-colors"
+                  >
+                    Open External Preview
+                  </button>
+                </div>
+              </div>
+              <iframe
+                ref={iframeRef}
+                title="remote-preview"
+                className="flex-1 border-none w-full h-full bg-white"
+                src={remotePreview.previewUrl}
+                sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"
+              />
+            </div>
           ) : useStaticPreview && staticUrl ? (
             <div className="flex flex-col w-full h-full relative">
               <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-500">
@@ -1109,6 +1214,48 @@ export const Preview = memo(({ setSelectedElement }: PreviewProps) => {
               <p className="text-xs text-bolt-elements-textSecondary max-w-xs mb-4 leading-relaxed">
                 Live Server Preview requires a WebContainer environment (desktop browser) or a configured Remote Runtime.
               </p>
+              {runtime.mode === 'remote' && (
+                <div className="bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor rounded-xl p-4 max-w-sm mb-3 text-left">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="text-xs font-semibold text-bolt-elements-textPrimary">Remote Preview</span>
+                    <span
+                      className={classNames('text-[10px] uppercase px-2 py-0.5 rounded-full border', {
+                        'bg-gray-500/10 border-gray-500/30 text-gray-400': !remotePreview || remotePreview.status === 'none',
+                        'bg-purple-500/10 border-purple-500/30 text-purple-400': remotePreview?.status === 'starting',
+                        'bg-green-500/10 border-green-500/30 text-green-400': remotePreview?.status === 'running',
+                        'bg-red-500/10 border-red-500/30 text-red-400': remotePreview?.status === 'failed',
+                      })}
+                    >
+                      {remotePreview?.status ?? 'none'}
+                    </span>
+                  </div>
+                  {missingRemotePreviewConfig.length > 0 ? (
+                    <p className="text-xs text-amber-400 leading-relaxed">
+                      Remote preview needs: {missingRemotePreviewConfig.join(', ')}.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-bolt-elements-textSecondary leading-relaxed mb-3">
+                        {remotePreviewError ?? remotePreview?.message ?? 'Run npm run dev or pnpm run dev, then refresh preview status.'}
+                      </p>
+                      {remotePreview?.port && (
+                        <p className="text-[10px] text-bolt-elements-textTertiary mb-2">Detected port: {remotePreview.port}</p>
+                      )}
+                      <p className="text-[10px] text-bolt-elements-textTertiary leading-relaxed mb-3">
+                        On Android, laptop localhost is not reachable. Run Vite with --host 0.0.0.0 and use your laptop LAN IP.
+                      </p>
+                      <button
+                        onClick={() => refreshRemotePreview()}
+                        disabled={remotePreviewLoading}
+                        className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        <span className={remotePreviewLoading ? 'i-ph:spinner-gap animate-spin' : 'i-ph:arrow-clockwise'} />
+                        Refresh Preview
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               {hasStaticHtml ? (
                 <div className="bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor rounded-xl p-4 max-w-sm">
                   <p className="text-xs text-bolt-elements-textSecondary mb-3">

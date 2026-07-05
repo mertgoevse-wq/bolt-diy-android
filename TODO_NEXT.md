@@ -179,6 +179,28 @@
 
 ---
 
+## Phase 5.5: Remote Runtime Live Preview ✅ DONE
+
+**Goal:** Show a real live preview URL on Android when Remote Runtime runs a dev server.
+
+- [x] Track active dev-server command output per workspace
+- [x] Detect common Vite URLs from stdout/stderr:
+  - [x] `http://localhost:5173/`
+  - [x] `http://192.168.x.x:5173/`
+  - [x] `http://0.0.0.0:5173/`
+- [x] Store preview status: `none`, `starting`, `running`, `failed`
+- [x] Store preview metadata: port, local URL, network URL, last detected timestamp, command ID
+- [x] Implement JSON `GET /workspace/:id/preview`
+- [x] Add safe HTML fallback route `GET /workspace/:id/preview-page`
+- [x] Update `RemoteRuntimeClient.getPreviewUrl()` to call the real JSON endpoint
+- [x] Update Android Preview fallback with Refresh Preview and Open External Preview controls
+- [x] Load detected direct LAN preview URLs in the Android preview iframe
+- [x] Document that Remote Runtime and Vite must bind to `0.0.0.0` for phone access
+- [x] Do not add an unsafe preview proxy yet
+- [x] **Commit:** `feat: add remote runtime live preview status`
+
+---
+
 ## Phase 5b: AI Provider Integration
 
 **Goal:** Make LLM chat work without a Remix server.

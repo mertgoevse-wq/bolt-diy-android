@@ -379,8 +379,9 @@ export default function RuntimeModeTab() {
         </div>
 
         <p className="text-xs text-bolt-elements-textSecondary">
-          Remote Runtime currently syncs text files only. Local IndexedDB remains the source of truth. On Android,
-          localhost is the phone; use your laptop LAN IP such as http://192.168.x.x:8787.
+          Remote Runtime syncs text files, runs safe command profiles, and detects live preview URLs. Local IndexedDB
+          remains the source of truth. On Android, localhost is the phone; use your laptop LAN IP such as
+          http://192.168.x.x:8787. For live preview, run project dev servers with --host 0.0.0.0 or equivalent.
         </p>
 
         <div className="flex gap-2">

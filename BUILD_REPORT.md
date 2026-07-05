@@ -313,12 +313,58 @@ No required Phase 5.3 file remains missing. `RemoteWorkspaceSync.ts` was missing
 
 ---
 
+## Phase 5.5: Remote Runtime Live Preview Status
+
+### Implemented
+
+| Area | Change |
+|------|--------|
+| Preview state tracking | Added per-workspace preview status: `none`, `starting`, `running`, `failed` |
+| Dev command integration | Observes safe `npm run dev` and `pnpm run dev` command events without adding arbitrary command input |
+| URL detection | Detects common Vite-style URLs from stdout/stderr, including `localhost`, LAN IPs, and `0.0.0.0` |
+| Preview metadata | Stores port, local URL, network URL, last detection time, and command ID |
+| Preview API | Replaced stub `GET /workspace/:id/preview` HTML with JSON status and added `/workspace/:id/preview-page` HTML fallback |
+| Client SDK | Updated `RemoteRuntimeClient.getPreviewUrl()` to call the real JSON endpoint with typed preview status |
+| Android preview UI | Added remote preview refresh/status card, direct preview iframe loading, and external-open control |
+| Proxy decision | No unsafe preview proxy was added; Android uses direct detected network URLs |
+| LAN guidance | Updated docs to require `REMOTE_RUNTIME_HOST=0.0.0.0` and Vite `--host 0.0.0.0` for phone access |
+
+### Audit Notes
+
+| File | Result |
+|------|--------|
+| `remote-runtime/src/server.ts` | Preview endpoint was a stub; now returns JSON status and safe HTML fallback |
+| `remote-runtime/src/commands.ts` | Existing command event stream reused; no new command surface added |
+| `remote-runtime/src/preview.ts` | Added in this run for preview state and output URL detection |
+| `RemoteRuntimeClient.ts` | Existing stub method completed with typed REST call |
+| `Preview.tsx` | Existing static fallback extended with Remote Runtime live preview status and iframe loading |
+| Docs/status files | Updated for direct LAN preview behavior and no-proxy limitation |
+
+### Exact Changes Made In This Run
+
+- Added `remote-runtime/src/preview.ts` to observe safe dev-command output and maintain per-workspace preview metadata.
+- Updated `remote-runtime/src/server.ts` so command events update preview state before WebSocket broadcast.
+- Implemented JSON `GET /workspace/:id/preview` and safe HTML `GET /workspace/:id/preview-page`.
+- Updated Android `Preview.tsx` to refresh Remote Runtime preview status, render direct LAN preview URLs, and expose an external-open button.
+- Updated Remote Runtime docs, Android guide, current status, TODO list, and this report.
+
+### Verification In This Run
+
+| Command / Check | Result |
+|-----------------|--------|
+| `npm run typecheck` | ✅ Passed |
+| `npm run android:webbuild` | ✅ Passed; existing Vite/UnoCSS/icon/chunk warnings only |
+| `npm run android:sync` | ✅ Passed; Capacitor sync completed |
+| `npm --prefix remote-runtime run build` | ✅ Passed |
+
+---
+
 ## Remaining Limitations
 
 | Area | Status | Notes |
 |------|--------|-------|
 | LLM chat | ❌ | API routes require server; Phase 5 fix |
-| Live preview | ⚠️ | Polished fallback UI; basic static HTML preview supported; full dev server needs Remote Runtime |
+| Live preview | ✅ | Remote Runtime direct LAN preview status implemented; local static HTML preview remains supported; no preview proxy yet |
 | Terminal | ⚠️ | Polished fallback UI with remote runtime setup redirection |
 | File persistence | ✅ | IndexedDB working |
 | UI layout (mobile) | ⚠️ | Basic tab nav works; full Phase 2 responsive pass pending |

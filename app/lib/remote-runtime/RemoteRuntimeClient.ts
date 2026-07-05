@@ -74,6 +74,21 @@ export interface RemoteRuntimeEvent {
   };
 }
 
+export type RemotePreviewStatus = 'none' | 'starting' | 'running' | 'failed';
+
+export interface RemotePreviewResponse {
+  ok: true;
+  status: RemotePreviewStatus;
+  port?: number;
+  localUrl?: string;
+  networkUrl?: string;
+  proxyUrl?: string;
+  previewUrl?: string;
+  lastDetectedAt?: string;
+  commandId?: string;
+  message: string;
+}
+
 /**
  * RemoteRuntimeClient
  *
@@ -273,15 +288,14 @@ export class RemoteRuntimeClient {
   }
 
   /**
-   * Get Preview URL (Stub): GET /workspace/:id/preview
+   * Get live preview status: GET /workspace/:id/preview
    */
-  async getPreviewUrl(): Promise<{ port: number; previewUrl: string }> {
+  async getPreviewUrl(): Promise<RemotePreviewResponse> {
     if (!this.workspaceId) {
       throw new Error('Workspace ID is not set.');
     }
 
-    console.log(`[RemoteRuntimeClient] Stub: getPreviewUrl for workspace ${this.workspaceId}`);
-    return { port: 5173, previewUrl: `${this.serverUrl}/workspace/${this.workspaceId}/preview` };
+    return this.request<RemotePreviewResponse>(`/workspace/${this.workspaceId}/preview`, { method: 'GET' });
   }
 
   /**

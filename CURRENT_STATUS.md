@@ -146,12 +146,13 @@ bolt-diy-android/
 | Terminal on Android | ⚠️ Polished fallback | Replaces empty xterm with designed screen & settings redirection |
 | File system on Android | ✅ IndexedDB persistence | In-memory store + IndexedDB auto-save/restore across restarts |
 | Android WebView shell | ✅ Real UI loads | `android:webbuild` → `build/client/index.html` → Capacitor |
-| Preview on Android | ⚠️ Basic static preview | Designed fallback screen; supports local static HTML (`index.html`) preview |
+| Preview on Android | ✅ Remote/static preview | Designed fallback supports local static HTML and Remote Runtime live preview status/direct LAN URLs |
 | LLM chat on Android | ❌ Not working | 33 server-side API routes have no server in WebView |
 | Mobile UI | ❌ Not started | Desktop layouts break at 360px (533px min-width, 1200px modal) |
 | APK build | ✅ Automated | `android:apk:debug` compiles the debug APK via Gradle wrapper |
 | Remote Runtime file sync | ✅ MVP complete | Explicit text-file push/pull/single-file sync; IndexedDB remains source of truth |
 | Remote Runtime command profiles | ✅ MVP complete | Safe allowlisted npm/pnpm install/dev/build profiles with WebSocket output, stop, and command status panel |
+| Remote Runtime live preview | ✅ MVP complete | Tracks `npm run dev` / `pnpm run dev` output, returns JSON preview status, and loads detected LAN preview URLs on Android |
 | Device tested | ❌ Not yet | No physical device testing done |
 
 ---
@@ -160,7 +161,7 @@ bolt-diy-android/
 
 1. **No LLM chat** — The app's core feature (AI chat) requires server-side API routes (`api.chat.ts`, `api.llmcall.ts`, etc.) which don't exist in a WebView. This is the #1 blocker for a usable app.
 
-2. **Live preview fallback** — Dev server preview is unavailable without WebContainer/Remote Runtime, but a designed fallback view is shown, and the user can run a basic static preview of any local `index.html` file using local Blob URLs.
+2. **Live preview fallback** — Dev server preview is unavailable without WebContainer/Remote Runtime. Remote Runtime now tracks dev-server URL output and the Android Preview tab can load a detected LAN URL; local `index.html` static Blob preview remains available.
 
 3. **Terminal fallback** — The terminal cannot run a local shell process without WebContainer. In Android fallback mode it shows setup guidance; in Remote Runtime mode it shows safe npm/pnpm command-profile buttons, streamed output, stop control, and last-command status. Free-form terminal input is still disabled.
 
@@ -170,15 +171,17 @@ bolt-diy-android/
 
 6. **Remote Runtime command execution** — Phase 5.4 allows only predefined profiles: `npm install`, `npm run dev`, `npm run build`, `pnpm install`, `pnpm run dev`, and `pnpm run build`. Commands require auth, run inside the workspace directory, enforce timeout, stream stdout/stderr/status/exit over WebSocket, and can be stopped.
 
-7. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
+7. **Remote Runtime live preview** — Phase 5.5 detects common Vite dev-server URLs from safe dev-command stdout/stderr, exposes `GET /workspace/:id/preview` JSON status, and loads direct network URLs in Android. No preview proxy is implemented yet; projects must bind dev servers to `0.0.0.0` for phone access.
 
-8. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
+8. **Desktop layout breaks on mobile** — `--chat-min-width: 533px` forces horizontal scroll. Settings modal is 1200px wide. `react-resizable-panels` doesn't support touch resize. `react-dnd` with `HTML5Backend` doesn't work on touchscreens.
 
-9. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
+9. **No git operations** — `isomorphic-git` uses WebContainer FS as backend. Without WC, git clone/commit/push all fail. The GitHub Sync panel shows configuration but commit/push buttons are disabled with explanations.
 
-10. **Speech recognition unreliable** — `webkitSpeechRecognition` may not be available in all Android WebView versions.
+10. **Screenshot selector broken** — Uses `navigator.mediaDevices.getDisplayMedia()` which doesn't exist in Android WebView.
 
-11. **Android build workflow** — The Android build workflow is now fully automated. `npm run android:apk:debug` compiles the debug APK containing the fully functional SPA build.
+11. **Speech recognition unreliable** — `webkitSpeechRecognition` may not be available in all Android WebView versions.
+
+12. **Android build workflow** — The Android build workflow is now fully automated. `npm run android:apk:debug` compiles the debug APK containing the fully functional SPA build.
 
 ---
 
@@ -189,11 +192,12 @@ bolt-diy-android/
 | `build/client/` | ✅ Complete | Vite SPA build generates real React SPA assets correctly |
 | LLM chat (`api.chat.ts`) | No server in WebView | Phase 5: remote proxy or Capacitor HTTP client |
 | Model listing (`api.models.ts`) | No server in WebView | Phase 5: client-side or proxy |
-| Preview iframe | ✅ Complete | Designed fallback and local static HTML preview implemented |
+| Preview iframe | ✅ Complete | Designed fallback, local static HTML preview, and Remote Runtime live preview status/direct LAN URL loading implemented |
 | Terminal process | ✅ Complete | Designed fallback and settings redirection implemented |
 | File system persistence | ✅ Complete | InMemoryFS with IndexedDB backing automatically saves and restores files |
 | Remote Runtime file sync | ✅ MVP complete | Text-only push/pull/current-file sync; local IndexedDB wins on conflict |
 | Remote Runtime command profiles | ✅ MVP complete | Allowlisted npm/pnpm profiles only; output streams over WebSocket and command metadata is shown in the terminal panel |
+| Remote Runtime live preview | ✅ MVP complete | Detects Vite-style URLs from dev command output; JSON preview status and Android preview refresh are implemented |
 | Git operations | FS backend missing | Phase 3: InMemoryFS for isomorphic-git. GitHub Sync panel saves config only |
 | Settings modal | 1200px fixed width | Phase 2: `w-full max-w-[1200px]` |
 | Chat layout | Forces 533px min width | Phase 2: responsive CSS override |
